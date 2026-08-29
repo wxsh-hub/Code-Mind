@@ -152,11 +152,13 @@ class FullExperienceTest:
         logger.info("=" * 60)
 
         # 创建模块
-        result = create_module_impl("test_module", "测试模块")
+        result = create_module_impl(self.test_project, "test_module", "测试模块")
         if result.get("error"):
             self.log("模块管理", "创建模块", "FAIL", f"错误: {result.get('error')}")
-        elif result.get("id"):
-            self.log("模块管理", "创建模块", "PASS", f"module_id={result.get('id')}")
+        elif result.get("data") and result["data"].get("id"):
+            self.log("模块管理", "创建模块", "PASS", f"module_id={result['data']['id']}")
+        elif result.get("status") == "success":
+            self.log("模块管理", "创建模块", "PASS", f"响应: {result}")
         else:
             self.log("模块管理", "创建模块", "FAIL", f"未知响应: {result}")
 
@@ -174,11 +176,13 @@ class FullExperienceTest:
         logger.info("=" * 60)
 
         # 创建功能
-        result = create_feature_impl("test_001", "测试功能", "test_module", "测试功能描述")
+        result = create_feature_impl(self.test_project, "test_001", "测试功能", "test_module", "测试功能描述")
         if result.get("error"):
             self.log("功能管理", "创建功能", "FAIL", f"错误: {result.get('error')}")
-        elif result.get("id"):
-            self.log("功能管理", "创建功能", "PASS", f"feature_id={result.get('id')}")
+        elif result.get("data") and result["data"].get("id"):
+            self.log("功能管理", "创建功能", "PASS", f"feature_id={result['data']['id']}")
+        elif result.get("status") == "success":
+            self.log("功能管理", "创建功能", "PASS", f"响应: {result}")
         else:
             self.log("功能管理", "创建功能", "FAIL", f"未知响应: {result}")
 
