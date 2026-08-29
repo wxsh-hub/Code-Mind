@@ -278,6 +278,119 @@ result = ask_project(
 
 ---
 
+## 本地知识快照
+
+### 目标
+
+按功能编号生成本地知识快照，减少网络请求和 Token 消耗。
+
+### 流程
+
+```
+AI 开始处理 2437 功能
+    ↓
+[1] 查询知识库：feature_codes=["2437"] 的所有向量
+    ↓
+[2] 过滤过期内容
+    - deprecated = true → 排除
+    - confidence < 3 → 排除
+    - 更新时间 > 30天 → 标记过期
+    ↓
+[3] 按置信度排序
+    ↓
+[4] 简单拼接成 MD（不调用 AI）
+    ↓
+[5] 保存到本地：.cache/{project}/{feature_code}.md
+    ↓
+AI 后续问题先查本地快照
+```
+
+### 快照格式
+
+```markdown
+# 2437: 人员管理 - 知识快照
+
+> 生成时间：2026-08-29 18:00
+> 向量数量：5
+> 过滤掉：2 个过期、1 个低置信度
+
+---
+
+**置信度：8**
+
+实现了用户增删改查功能：
+- 新增用户接口：POST /api/user
+- 编辑用户接口：PUT /api/user/{id}
+
+---
+
+**置信度：5**
+
+⚠️ 内容可能过期（30天前更新）
+
+删除用户时需要级联删除关联数据
+```
+
+### 过滤逻辑
+
+```python
+def filter_vectors(vectors):
+    """过滤过期内容"""
+    filtered = []
+    for v in vectors:
+        # 排除已废弃
+        if v.metadata.get("deprecated"):
+            continue
+        # 排除低置信度
+        if v.metadata.get("confidence", 1) < 3:
+            continue
+        # 标记可能过期
+        if v.metadata.get("days_old", 0) > 30:
+            v.metadata["stale_warning"] = "⚠️ 内容可能过期"
+        filtered.append(v)
+    return filtered
+```
+
+### 性能对比
+
+| 方案 | 耗时 | Token 消耗 |
+|------|------|-----------|
+| 每次查知识库 | 10 次 = 10-30 秒 | 1000-2000 |
+| 本地快照 | 1 次 = 1 秒 | 0 |
+
+### 使用方式
+
+```python
+# 生成快照（首次）
+snapshot = generate_feature_snapshot("Code-Mind", "2437")
+
+# AI 问问题（先查本地）
+result = local_search(snapshot, "如何添加用户")
+if result:
+    return result  # 本地命中
+
+# 本地没有，查知识库
+result = ask_project("如何添加用户", feature_codes=["2437"])
+```
+
+### MCP 工具
+
+```python
+# 生成功能知识快照
+generate_snapshot(
+    project="Code-Mind",
+    feature_code="2437"
+)
+
+# 预加载多个功能快照
+preload_snapshots(
+    project="Code-Mind",
+    feature_codes=["2437", "2438", "2439"]
+)
+```
+
+---
+
 ## 实现步骤
 
 ### 第一阶段：数据库改造（ragent）
