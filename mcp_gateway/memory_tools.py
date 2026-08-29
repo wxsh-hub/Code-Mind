@@ -15,6 +15,7 @@ import tempfile
 import os
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
+from mcp_gateway.path_resolver import extract_paths, find_matching_chunks, build_reference_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,8 @@ class MemoryManager:
         return kb_id
 
     def upload_memory(self, project_name: str, filename: str, content: str,
-                      calculate_confidence: bool = True) -> Dict[str, Any]:
+                      calculate_confidence: bool = True,
+                      resolve_paths: bool = True) -> Dict[str, Any]:
         """上传记忆文件到项目知识库
 
         Args:
@@ -150,11 +152,37 @@ class MemoryManager:
             filename: 文件名
             content: 文件内容
             calculate_confidence: 是否计算置信度（默认 True）
+            resolve_paths: 是否解析路径引用（默认 True）
         """
         self.ensure_logged_in()
 
         # 获取或创建项目知识库
         kb_id = self.get_or_create_project_kb(project_name)
+
+        # 解析路径引用
+        path_refs = []
+        if resolve_paths:
+            try:
+                paths = extract_paths(content)
+                if paths:
+                    # 获取已有文档列表
+                    docs_resp = self._request("GET", f"/knowledge-base/{kb_id}/docs")
+                    existing_docs = []
+                    if isinstance(docs_resp.get("data"), dict):
+                        for record in docs_resp["data"].get("records", []):
+                            existing_docs.append({
+                                "id": record.get("id"),
+                                "name": record.get("docName", ""),
+                            })
+                    elif isinstance(docs_resp.get("data"), list):
+                        existing_docs = docs_resp["data"]
+
+                    # 查找匹配
+                    path_refs = find_matching_chunks(paths, existing_docs)
+                    if path_refs:
+                        logger.info(f"Found {len(path_refs)} path references in {filename}")
+            except Exception as e:
+                logger.warning(f"Path resolution failed: {e}")
 
         # 写入临时文件
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as f:
@@ -196,6 +224,7 @@ class MemoryManager:
                     "kb_id": kb_id,
                     "doc_id": doc_id,
                     "filename": filename,
+                    "path_references": len(path_refs),
                 }
             else:
                 return {"status": "error", "error": "No doc_id in response"}
