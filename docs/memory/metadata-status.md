@@ -1,57 +1,72 @@
+---
+name: metadata-status
+description: 元数据扩展状态
+metadata:
+  type: project
+---
+
 # 元数据扩展状态
 
 ## 状态
 - 完成度：100%
 - 最后更新：2026-08-29
 
-## 数据库变更
+## 数据库扩展
 
-### 新增字段（t_knowledge_chunk 表）
+### t_knowledge_chunk 新增字段
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| source_type | VARCHAR(32) | 'upload' | 来源类型：upload/gitlab/api |
-| source_ref | VARCHAR(512) | NULL | 来源引用，如 gitlab://project/path/file.md |
-| chunk_version | INT | 1 | chunk 版本号，同文件更新时递增 |
-| vote_count | INT | 0 | 被引用/检索命中次数 |
-| conflict_pair_id | VARCHAR(64) | NULL | 矛盾对的另一个 chunk ID |
-| deprecated | BOOLEAN | FALSE | 是否已废弃 |
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| metadata | JSONB | 元数据（feature_codes, module） |
+| upload_count | INT | 上传次数 |
+| last_upload_at | DATETIME | 最后上传时间 |
+| confidence | INT | 置信度 |
 
-### 新增索引
-- `idx_kc_source_ref`：加速按来源查询
-- `idx_kc_conflict_pair`：加速按矛盾对查询
+### metadata JSONB 结构
 
-## 实体类变更
-
-### KnowledgeChunkDO 新增字段
-```java
-private String sourceType;
-private String sourceRef;
-private Integer chunkVersion;
-private Integer voteCount;
-private String conflictPairId;
-private Boolean deprecated;
+```json
+{
+    "feature_codes": ["2437", "2438"],
+    "module": "user",
+    "type": "api",
+    "version": "1.0"
+}
 ```
 
-### KnowledgeChunkVO 新增字段
-```java
-private String sourceType;
-private String sourceRef;
-private Integer chunkVersion;
-private Integer voteCount;
-private String conflictPairId;
-private Boolean deprecated;
+## 新增表
+
+### t_module（模块表）
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | VARCHAR(64) | 主键 |
+| name | VARCHAR(64) | 模块名称（唯一） |
+| description | TEXT | 模块描述 |
+| created_by | VARCHAR(64) | 创建人 |
+| created_at | DATETIME | 创建时间 |
+
+### t_feature_metadata（功能元数据表）
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | VARCHAR(64) | 主键 |
+| feature_code | VARCHAR(32) | 功能编号（唯一） |
+| feature_name | VARCHAR(128) | 功能名称 |
+| module_name | VARCHAR(64) | 所属模块 |
+| description | TEXT | 功能描述 |
+| status | VARCHAR(16) | 状态（active/deprecated） |
+
+## 索引
+
+```sql
+CREATE INDEX idx_kc_metadata ON t_knowledge_chunk USING GIN (metadata);
+CREATE INDEX idx_kc_upload_count ON t_knowledge_chunk(upload_count);
+CREATE INDEX idx_kc_last_upload ON t_knowledge_chunk(last_upload_at);
+CREATE INDEX idx_module_name ON t_module(name);
+CREATE INDEX idx_fm_feature_code ON t_feature_metadata(feature_code);
+CREATE INDEX idx_fm_module_name ON t_feature_metadata(module_name);
 ```
 
 ## 迁移脚本
-- `resources/database/upgrades/v2.1.0/260829_chunk_metadata.sql`
 
-## 测试验证
-- SQL 执行成功
-- 实体类编译通过
-- API 测试通过（12/12）
-
-## 相关文件
 - `resources/database/upgrades/v2.1.0/260829_chunk_metadata.sql`
-- `rag/src/main/java/.../knowledge/dao/entity/KnowledgeChunkDO.java`
-- `rag/src/main/java/.../knowledge/controller/vo/KnowledgeChunkVO.java`
+- `resources/database/upgrades/v2.1.0/260829_chunk_confidence.sql`
+- `resources/database/upgrades/v2.1.0/260829_module_feature.sql`

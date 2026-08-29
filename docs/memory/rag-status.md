@@ -1,37 +1,57 @@
+---
+name: rag-status
+description: RAG 核心模块状态
+metadata:
+  type: project
+---
+
 # RAG 核心模块状态
 
 ## 状态
 - 完成度：90%
 - 最后更新：2026-08-29
 
-## 核心能力
-- 多通道检索：向量、关键词、知识图谱、联网搜索
-- RRF 融合 + Rerank 重排序
-- 意图识别与多知识库路由
-- Agent ReAct 执行架构
+## 核心功能
 
-## 配置要点
-- Embedding 模型：`qwen-emb-8b`（百炼 text-embedding-v4）
-- 向量库：PostgreSQL + pgvector（dimension=1536, metric=COSINE）
-- 关键词检索：默认关闭（`rag.keyword.type=none`）
-- 图谱检索：默认关闭（`rag.graph.type=none`）
+### 多通道检索
+- **向量检索**：pgvector + COSINE 相似度
+- **关键词检索**：LIKE 模糊匹配（中文不准确）
+- **知识图谱**：默认关闭
+- **Web 搜索**：默认关闭
 
-## 已知配置
+### RRF 融合 + Rerank
+- 多通道结果融合
+- Rerank 重排序
+
+### 向量存储
+- **数据库**：PostgreSQL + pgvector
+- **维度**：1536（qwen-emb-8b）
+- **度量**：COSINE
+
+### Embedding 模型
+- **模型**：qwen-emb-8b（阿里百炼 text-embedding-v4）
+- **维度**：1536
+
+## 配置
+
 ```yaml
+ai:
+  providers:
+    bailian:
+      api-key: sk-ws-H.xxx
 rag:
-  vector:
-    type: pg
-  default:
-    collection-name: rag_default_store
-    dimension: 1536
-    metric-type: COSINE
+  mcp:
+    servers:
+      - name: experience-gateway
+        url: http://localhost:8000
 ```
 
-## 测试验证
-- RAG 全流程测试：8/8 通过
-- 支持 Markdown 文档上传、分块、向量化、检索、生成
+## 测试
 
-## 相关文件
-- `rag/src/main/java/.../rag/service/KnowledgeSearchFacade.java`
-- `rag/src/main/java/.../knowledge/service/impl/KnowledgeDocumentServiceImpl.java`
-- `bootstrap/src/main/resources/application.yaml`
+- test_rag_flow.sh：8/8 通过
+- test_chunk_api.sh：12/12 通过
+
+## 已知问题
+
+1. **中文 LIKE 检索不准确**：需要改为向量检索
+2. **RocketMQ 编码问题**：中文内容可能乱码
