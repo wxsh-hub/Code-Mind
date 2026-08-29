@@ -1,93 +1,131 @@
 # F1 向量删除功能
 
 ## 目标
-支持删除知识库、文档、单个向量，解决废弃功能无法删除的问题。
 
-## 实现思路
+支持多种删除方式，与 F7 元数据系统集成。
 
-### 1. ragent 侧 API（Java）
+## 删除方式
 
-需要在 KnowledgeChunkApiController 中新增：
+| 方式 | 说明 | 实现 |
+|------|------|------|
+| 按功能编号删除 | 删除某功能的所有向量 | metadata->'feature_codes' @> |
+| 按模块删除 | 删除某模块的所有向量 | metadata->>'module' = |
+| 按文档删除 | 删除某文档的所有向量 | doc_id = |
+| 按 chunk 删除 | 删除单个向量 | chunk_id = |
+| 按知识库删除 | 删除整个知识库 | kb_id = |
 
-```java
-// 删除整个知识库
-DELETE /knowledge-base/{kbId}
+## API 设计
 
-// 删除文档及其所有向量
-DELETE /knowledge-base/docs/{docId}
+### ragent 侧
 
-// 删除单个向量
-DELETE /knowledge-base/chunks/{chunkId}
-
-// 按条件批量删除
-POST /knowledge-base/chunks/batch-delete
-Body: {"kbId": "...", "sourceRef": "...", "tags": ["..."]}
+```
+DELETE /api/ragent/knowledge-base/{kbId}
+DELETE /api/ragent/knowledge-base/docs/{docId}
+DELETE /api/ragent/knowledge-base/chunks/{chunkId}
+DELETE /api/ragent/knowledge-base/chunks/by-feature/{code}
+DELETE /api/ragent/knowledge-base/chunks/by-module/{module}
 ```
 
-### 2. MCP Gateway 侧（Python）
-
-在 rag_client.py 中新增：
+### MCP 工具
 
 ```python
-def delete_knowledge_base(self, kb_id: str) -> bool
-def delete_document(self, doc_id: str) -> bool
-def delete_chunk(self, chunk_id: str) -> bool
-def batch_delete_chunks(self, kb_id: str, source_ref: str = None) -> int
+# 删除功能（级联删除向量）
+delete_feature(project="Code-Mind", code="2437")
+# 返回: {"deleted_chunks": 15}
+
+# 删除模块（级联删除功能和向量）
+delete_module(project="Code-Mind", name="user")
+# 返回: {"deleted_chunks": 50, "deleted_features": 3}
+
+# 删除记忆文件
+delete_memory(project="Code-Mind", filename="2437_人员管理.md")
+# 返回: {"deleted_chunks": 5}
+
+# 删除技能
+delete_skill(project="Code-Mind", skill_name="用户管理指南")
+# 返回: {"deleted_chunks": 3}
 ```
 
-在 memory_tools.py 中新增 MCP Tool：
+## 实现逻辑
+
+### 按功能编号删除
 
 ```python
-def delete_memory_impl(project: str, filename: str = None) -> dict
-# filename 为空时删除整个项目，否则删除指定文件
+def delete_by_feature_code(project, feature_code):
+    """删除某功能的所有向量"""
+    kb_id = get_project_kb(project)
+    
+    # 查询该功能的所有向量
+    chunks = query_chunks(
+        kb_id=kb_id,
+        where={"metadata->'feature_codes' @>": f'["{feature_code}"]'}
+    )
+    
+    # 批量删除
+    deleted_count = delete_chunks([c.id for c in chunks])
+    
+    return {"deleted_chunks": deleted_count}
 ```
 
-在 skill_tools.py 中新增 MCP Tool：
+### 按模块删除
 
 ```python
-def delete_skill_impl(project: str, skill_name: str, category: str = None) -> dict
+def delete_by_module(project, module):
+    """删除某模块的所有向量"""
+    kb_id = get_project_kb(project)
+    
+    # 查询该模块的所有向量
+    chunks = query_chunks(
+        kb_id=kb_id,
+        where={"metadata->>'module'": module}
+    )
+    
+    # 批量删除
+    deleted_count = delete_chunks([c.id for c in chunks])
+    
+    return {"deleted_chunks": deleted_count}
 ```
 
-### 3. MCP Tool 注册
-
-```python
-# 新增工具
-delete_memory(project, filename=None)  # 删除记忆
-delete_skill(project, skill_name, category=None)  # 删除技能
-delete_project(project)  # 删除整个项目（含 skills 和 memory）
-```
-
-## 测试脚本思路
+## 测试脚本
 
 ### test_vector_delete.sh
 
 ```
-1. 创建知识库
-2. 上传 3 个文档
-3. 验证分块成功
-4. 删除单个 chunk → 验证数量减少
-5. 删除整个文档 → 验证文档和 chunk 都删除
-6. 删除知识库 → 验证知识库不存在
-7. 测试删除不存在的资源（应返回成功或友好错误）
+1. 创建模块 user
+2. 创建功能 2437（模块 user）
+3. 上传文档到 2437
+4. 上传文档到 user 模块（无功能编号）
+5. 验证向量数量
+
+6. 删除功能 2437
+7. 验证 2437 的向量被删除
+8. 验证 user 模块的向量还在
+
+9. 删除模块 user
+10. 验证 user 的向量被删除
 ```
 
-### 单元测试 test_vector_delete.py
+### 单元测试
 
 ```python
 class TestVectorDelete:
-    def test_delete_chunk(self):
-        # mock 删除接口
-        # 验证调用正确
+    def test_delete_by_feature_code(self):
+        # 删除功能 2437
+        # 验证该功能的向量被删除
+        # 验证其他功能的向量还在
 
-    def test_delete_document(self):
-        # mock 删除接口
-        # 验证调用正确
+    def test_delete_by_module(self):
+        # 删除模块 user
+        # 验证该模块的所有向量被删除
+        # 验证其他模块的向量还在
 
-    def test_delete_nonexistent(self):
-        # 删除不存在的资源
-        # 验证不报错
+    def test_cascade_delete_feature(self):
+        # 删除功能时，同时删除功能元数据
+
+    def test_cascade_delete_module(self):
+        # 删除模块时，同时删除模块下所有功能和向量
 ```
 
 ## 依赖
-- ragent 需要先实现删除 API
-- MCP Gateway 调用 ragent API
+
+- F7 元数据系统（metadata JSONB 字段）
