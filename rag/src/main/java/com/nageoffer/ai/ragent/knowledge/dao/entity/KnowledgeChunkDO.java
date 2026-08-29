@@ -125,6 +125,32 @@ public class KnowledgeChunkDO {
     private Boolean deprecated;
 
     /**
+     * 置信度分数（基于语义相似向量的提交次数）
+     * <p>
+     * 计算方式：上传时搜索相似 chunk，置信度 = 相似 chunk 数量（含自己）
+     * 召回时按比例归一化到100 总分
+     */
+    private Integer confidence;
+
+    /**
+     * 元数据（JSONB 格式）
+     * <p>
+     * 存储功能编号、模块等信息：
+     * {"feature_codes": ["2437"], "module": "user"}
+     */
+    private String metadata;
+
+    /**
+     * 上传次数
+     */
+    private Integer uploadCount;
+
+    /**
+     * 最后上传时间
+     */
+    private Date lastUploadAt;
+
+    /**
      * 创建人
      */
     private String createdBy;

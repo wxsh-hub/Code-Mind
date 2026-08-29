@@ -103,6 +103,11 @@ public class KnowledgeChunkVO {
     private Boolean deprecated;
 
     /**
+     * 置信度分数
+     */
+    private Integer confidence;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;
