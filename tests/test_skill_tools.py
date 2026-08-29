@@ -82,7 +82,9 @@ Use PascalCase for classes.
         list_resp = MagicMock()
         list_resp.read.return_value = json.dumps({
             "code": "0",
-            "data": [{"id": 100, "name": "skills_TestProject"}],
+            "data": {
+                "records": [{"id": 100, "name": "skills_TestProject"}],
+            },
         }).encode("utf-8")
         list_resp.__enter__ = lambda s: s
         list_resp.__exit__ = MagicMock(return_value=False)
@@ -161,7 +163,9 @@ Use PascalCase for classes.
         list_resp = MagicMock()
         list_resp.read.return_value = json.dumps({
             "code": "0",
-            "data": [{"id": 100, "name": "skills_TestProject"}],
+            "data": {
+                "records": [{"id": 100, "name": "skills_TestProject"}],
+            },
         }).encode("utf-8")
         list_resp.__enter__ = lambda s: s
         list_resp.__exit__ = MagicMock(return_value=False)
@@ -211,7 +215,9 @@ class TestSkillToolsImpl(unittest.TestCase):
         list_resp = MagicMock()
         list_resp.read.return_value = json.dumps({
             "code": "0",
-            "data": [{"id": 100, "name": "skills_TestProject"}],
+            "data": {
+                "records": [{"id": 100, "name": "skills_TestProject"}],
+            },
         }).encode("utf-8")
         list_resp.__enter__ = lambda s: s
         list_resp.__exit__ = MagicMock(return_value=False)

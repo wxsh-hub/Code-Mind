@@ -25,10 +25,12 @@ class TestMemoryManager(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps({
             "code": "0",
-            "data": [
-                {"id": 123, "name": "memory_Code-Mind"},
-                {"id": 456, "name": "memory_MyApp"},
-            ],
+            "data": {
+                "records": [
+                    {"id": 123, "name": "memory_Code-Mind"},
+                    {"id": 456, "name": "memory_MyApp"},
+                ],
+            },
         }).encode("utf-8")
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
@@ -44,7 +46,9 @@ class TestMemoryManager(unittest.TestCase):
         list_resp = MagicMock()
         list_resp.read.return_value = json.dumps({
             "code": "0",
-            "data": [],
+            "data": {
+                "records": [],
+            },
         }).encode("utf-8")
         list_resp.__enter__ = lambda s: s
         list_resp.__exit__ = MagicMock(return_value=False)
@@ -80,7 +84,9 @@ class TestMemoryManager(unittest.TestCase):
         list_resp = MagicMock()
         list_resp.read.return_value = json.dumps({
             "code": "0",
-            "data": [{"id": 100, "name": "memory_TestProject"}],
+            "data": {
+                "records": [{"id": 100, "name": "memory_TestProject"}],
+            },
         }).encode("utf-8")
         list_resp.__enter__ = lambda s: s
         list_resp.__exit__ = MagicMock(return_value=False)
@@ -148,7 +154,9 @@ class TestMemoryManager(unittest.TestCase):
         list_resp = MagicMock()
         list_resp.read.return_value = json.dumps({
             "code": "0",
-            "data": [{"id": 100, "name": "memory_TestProject"}],
+            "data": {
+                "records": [{"id": 100, "name": "memory_TestProject"}],
+            },
         }).encode("utf-8")
         list_resp.__enter__ = lambda s: s
         list_resp.__exit__ = MagicMock(return_value=False)
@@ -194,11 +202,13 @@ class TestMemoryManager(unittest.TestCase):
         list_resp = MagicMock()
         list_resp.read.return_value = json.dumps({
             "code": "0",
-            "data": [
-                {"id": 100, "name": "memory_ProjectA"},
-                {"id": 200, "name": "memory_ProjectB"},
-                {"id": 300, "name": "other_kb"},
-            ],
+            "data": {
+                "records": [
+                    {"id": 100, "name": "memory_ProjectA"},
+                    {"id": 200, "name": "memory_ProjectB"},
+                    {"id": 300, "name": "other_kb"},
+                ],
+            },
         }).encode("utf-8")
         list_resp.__enter__ = lambda s: s
         list_resp.__exit__ = MagicMock(return_value=False)

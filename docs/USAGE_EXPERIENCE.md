@@ -111,3 +111,19 @@
 4. 测试逐级降级检索
 5. 测试矛盾检测
 6. 添加前端界面
+
+## 问题修复记录
+
+### 2026-08-30 修复
+
+1. **mcp_gateway 目录丢失**: 从 git 历史恢复 mcp_gateway 目录
+2. **测试脚本补充**:
+   - `test_comprehensive.py`: 综合测试脚本，覆盖所有功能
+   - `test_issues_fix.py`: 问题修复验证测试，针对具体问题
+
+### 测试覆盖
+
+| 测试脚本 | 覆盖内容 |
+|---------|---------|
+| test_comprehensive.py | 中文编码、中文搜索、Module/Feature CRUD、置信度计算、逐级降级检索、元数据存储、删除操作 |
+| test_issues_fix.py | 中文编码问题、中文LIKE搜索问题、Module/Feature API问题、置信度API问题 |
