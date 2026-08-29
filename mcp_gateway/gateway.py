@@ -24,6 +24,7 @@ from mcp_gateway.server import GatewayContext, Server
 from mcp_gateway.rag_tools import register_rag_tools
 from mcp_gateway.memory_tools import register_memory_tools
 from mcp_gateway.skill_tools import register_skill_tools
+from mcp_gateway.feature_tools import register_feature_tools
 # --- Global Config for Args ---
 cli_args = None
 log_level = os.environ.get("LOGLEVEL", "INFO").upper()
@@ -453,6 +454,13 @@ async def lifespan(server: FastMCP) -> AsyncIterator[GatewayContext]:
         logger.info("Skill tools registered successfully")
     except Exception as e:
         logger.warning(f"Failed to register skill tools: {e}")
+
+    # Register Feature tools (create_module, create_feature, etc.)
+    try:
+        register_feature_tools(server)
+        logger.info("Feature tools registered successfully")
+    except Exception as e:
+        logger.warning(f"Failed to register feature tools: {e}")
 
     try:
         # Yield the context containing servers and plugin manager

@@ -150,3 +150,105 @@ class RAGClient:
         self.ensure_logged_in()
         resp = self._request("GET", f"/knowledge-base/docs/{doc_id}/chunks")
         return resp.get("data", [])
+
+    # ========== 模块管理 ==========
+
+    def create_module(self, name: str, description: str = "") -> Dict[str, Any]:
+        """创建模块"""
+        self.ensure_logged_in()
+        resp = self._request("POST", "/modules", {
+            "name": name,
+            "description": description,
+        })
+        return resp.get("data", {})
+
+    def list_modules(self) -> List[Dict[str, Any]]:
+        """列出所有模块"""
+        self.ensure_logged_in()
+        resp = self._request("GET", "/modules")
+        return resp.get("data", [])
+
+    def get_module(self, name: str) -> Optional[Dict[str, Any]]:
+        """获取模块详情"""
+        self.ensure_logged_in()
+        try:
+            resp = self._request("GET", f"/modules/{name}")
+            return resp.get("data")
+        except RuntimeError:
+            return None
+
+    def delete_module(self, name: str) -> Dict[str, Any]:
+        """删除模块（级联删除功能和向量）"""
+        self.ensure_logged_in()
+        resp = self._request("DELETE", f"/modules/{name}")
+        return resp.get("data", {})
+
+    # ========== 功能管理 ==========
+
+    def create_feature(self, code: str, name: str, module_name: str,
+                       description: str = "") -> Dict[str, Any]:
+        """创建功能"""
+        self.ensure_logged_in()
+        resp = self._request("POST", "/feature-metadata", {
+            "featureCode": code,
+            "featureName": name,
+            "moduleName": module_name,
+            "description": description,
+        })
+        return resp.get("data", {})
+
+    def list_features(self, module_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """列出功能"""
+        self.ensure_logged_in()
+        path = "/feature-metadata"
+        if module_name:
+            path += f"?module={module_name}"
+        resp = self._request("GET", path)
+        return resp.get("data", [])
+
+    def get_feature(self, code: str) -> Optional[Dict[str, Any]]:
+        """获取功能详情"""
+        self.ensure_logged_in()
+        try:
+            resp = self._request("GET", f"/feature-metadata/{code}")
+            return resp.get("data")
+        except RuntimeError:
+            return None
+
+    def delete_feature(self, code: str) -> Dict[str, Any]:
+        """删除功能（级联删除向量）"""
+        self.ensure_logged_in()
+        resp = self._request("DELETE", f"/feature-metadata/{code}")
+        return resp.get("data", {})
+
+    # ========== 带元数据的检索 ==========
+
+    def search_with_metadata(self, query: str, kb_id: Optional[str] = None,
+                              feature_codes: Optional[List[str]] = None,
+                              module: Optional[str] = None,
+                              top_k: int = 10) -> Dict[str, Any]:
+        """带元数据的检索（支持逐级降级）"""
+        self.ensure_logged_in()
+        body: Dict[str, Any] = {"query": query, "topK": top_k}
+        if kb_id:
+            body["kbId"] = kb_id
+        if feature_codes:
+            body["featureCodes"] = ",".join(feature_codes)
+        if module:
+            body["module"] = module
+        resp = self._request("POST", "/knowledge-base/search/similar", body)
+        return resp
+
+    # ========== 按元数据删除 ==========
+
+    def delete_by_feature_code(self, code: str) -> Dict[str, Any]:
+        """按功能编号删除向量"""
+        self.ensure_logged_in()
+        resp = self._request("DELETE", f"/knowledge-base/chunks/by-feature/{code}")
+        return resp.get("data", {})
+
+    def delete_by_module(self, module: str) -> Dict[str, Any]:
+        """按模块删除向量"""
+        self.ensure_logged_in()
+        resp = self._request("DELETE", f"/knowledge-base/chunks/by-module/{module}")
+        return resp.get("data", {})
