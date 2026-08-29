@@ -144,7 +144,9 @@ class MemoryManager:
 
     def upload_memory(self, project_name: str, filename: str, content: str,
                       calculate_confidence: bool = True,
-                      resolve_paths: bool = True) -> Dict[str, Any]:
+                      resolve_paths: bool = True,
+                      feature_codes: Optional[List[str]] = None,
+                      module: Optional[str] = None) -> Dict[str, Any]:
         """上传记忆文件到项目知识库
 
         Args:
@@ -153,6 +155,8 @@ class MemoryManager:
             content: 文件内容
             calculate_confidence: 是否计算置信度（默认 True）
             resolve_paths: 是否解析路径引用（默认 True）
+            feature_codes: 功能编号列表（可选）
+            module: 模块名称（可选）
         """
         self.ensure_logged_in()
 
@@ -190,11 +194,18 @@ class MemoryManager:
             temp_path = f.name
 
         try:
+            # 构建上传参数
+            upload_fields = {"sourceType": "file", "processMode": "chunk"}
+            if feature_codes:
+                upload_fields["featureCodes"] = ",".join(feature_codes)
+            if module:
+                upload_fields["module"] = module
+
             # 上传文档
             resp = self._upload_file(
                 f"/knowledge-base/{kb_id}/docs/upload",
                 temp_path,
-                extra_fields={"sourceType": "file", "processMode": "chunk"},
+                extra_fields=upload_fields,
             )
 
             doc_id = resp.get("data", {}).get("id")
@@ -235,28 +246,61 @@ class MemoryManager:
             os.unlink(temp_path)
 
     def ask_project(self, project_name: str, question: str, top_k: int = 5,
-                    normalize: bool = True) -> Dict[str, Any]:
-        """向项目知识库提问
+                    normalize: bool = True,
+                    feature_codes: Optional[List[str]] = None,
+                    module: Optional[str] = None) -> Dict[str, Any]:
+        """向项目知识库提问（支持逐级降级检索）
 
         Args:
             project_name: 项目名称
             question: 问题
             top_k: 返回数量
             normalize: 是否归一化置信度到100 分（默认 True）
+            feature_codes: 功能编号列表（优先级最高）
+            module: 模块名称（次优先级）
         """
         self.ensure_logged_in()
 
         # 获取项目知识库
         kb_id = self.get_or_create_project_kb(project_name)
 
-        # 相似检索
-        resp = self._request("POST", "/knowledge-base/search/similar", {
-            "query": question,
-            "kbId": kb_id,
-            "topK": top_k,
-        })
+        # 逐级降级检索
+        level = "global"
+        results = []
 
-        results = resp.get("data", [])
+        # [1] 功能级检索
+        if feature_codes:
+            resp = self._request("POST", "/knowledge-base/search/similar", {
+                "query": question,
+                "kbId": kb_id,
+                "topK": top_k,
+                "featureCodes": ",".join(feature_codes),
+            })
+            results = resp.get("data", [])
+            if results:
+                level = "feature"
+
+        # [2] 模块级检索
+        if not results and module:
+            resp = self._request("POST", "/knowledge-base/search/similar", {
+                "query": question,
+                "kbId": kb_id,
+                "topK": top_k,
+                "module": module,
+            })
+            results = resp.get("data", [])
+            if results:
+                level = "module"
+
+        # [3] 全库检索
+        if not results:
+            resp = self._request("POST", "/knowledge-base/search/similar", {
+                "query": question,
+                "kbId": kb_id,
+                "topK": top_k,
+            })
+            results = resp.get("data", [])
+            level = "global"
 
         # 记录引用
         for item in results:
@@ -295,6 +339,9 @@ class MemoryManager:
                 "metadata": item.get("metadata", {}),
                 "confidence": conf.get("confidence", 1),
                 "normalizedScore": conf.get("normalizedScore", 0),
+                "upload_count": item.get("uploadCount", 1),
+                "last_upload": item.get("lastUploadAt", ""),
+                "days_old": item.get("daysOld", 0),
             })
 
         return {
@@ -302,7 +349,9 @@ class MemoryManager:
             "question": question,
             "results": enriched_results,
             "count": len(enriched_results),
-            "totalConfidence": sum(r.get("confidence", 1) for r in enriched_results),
+            "level": level,
+            "feature_codes": feature_codes,
+            "module": module,
         }
 
     def list_projects(self) -> List[Dict[str, Any]]:
@@ -346,34 +395,44 @@ def set_manager(manager: MemoryManager):
 
 # MCP Tool 实现
 
-def upload_memory_impl(project: str, filename: str, content: str) -> Dict[str, Any]:
+def upload_memory_impl(project: str, filename: str, content: str,
+                       feature_codes: Optional[List[str]] = None,
+                       module: Optional[str] = None) -> Dict[str, Any]:
     """上传记忆文件到项目知识库
 
     Args:
         project: 项目名称，如 "Code-Mind"、"MyApp"
         filename: 文件名，如 "MEMORY.md"、"rag-status.md"
         content: 文件内容
+        feature_codes: 功能编号列表（可选）
+        module: 模块名称（可选）
 
     Returns:
         上传结果
     """
     manager = get_manager()
-    return manager.upload_memory(project, filename, content)
+    return manager.upload_memory(project, filename, content,
+                                 feature_codes=feature_codes, module=module)
 
 
-def ask_project_impl(project: str, question: str, top_k: int = 5) -> Dict[str, Any]:
-    """向项目知识库提问
+def ask_project_impl(project: str, question: str, top_k: int = 5,
+                     feature_codes: Optional[List[str]] = None,
+                     module: Optional[str] = None) -> Dict[str, Any]:
+    """向项目知识库提问（支持逐级降级检索）
 
     Args:
         project: 项目名称，如 "Code-Mind"
         question: 问题内容，如 "RAG 模块的完成度是多少？"
         top_k: 返回结果数量
+        feature_codes: 功能编号列表（优先级最高）
+        module: 模块名称（次优先级）
 
     Returns:
         包含答案的结果
     """
     manager = get_manager()
-    return manager.ask_project(project, question, top_k)
+    return manager.ask_project(project, question, top_k,
+                               feature_codes=feature_codes, module=module)
 
 
 def list_projects_impl() -> Dict[str, Any]:
@@ -407,6 +466,15 @@ UPLOAD_MEMORY_TOOL = {
                 "type": "string",
                 "description": "文件内容（Markdown 格式）",
             },
+            "feature_codes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "功能编号列表（可选），如 ['2437', '2438']",
+            },
+            "module": {
+                "type": "string",
+                "description": "模块名称（可选），如 'user'、'order'",
+            },
         },
         "required": ["project", "filename", "content"],
     },
@@ -414,7 +482,7 @@ UPLOAD_MEMORY_TOOL = {
 
 ASK_PROJECT_TOOL = {
     "name": "ask_project",
-    "description": "向项目知识库提问。根据项目名检索对应的知识库，返回相关的记忆内容。用于查询项目状态、规范、经验等。",
+    "description": "向项目知识库提问。支持逐级降级检索：功能级→模块级→全库。",
     "inputSchema": {
         "type": "object",
         "properties": {
@@ -430,6 +498,15 @@ ASK_PROJECT_TOOL = {
                 "type": "integer",
                 "description": "返回结果数量，默认 5",
                 "default": 5,
+            },
+            "feature_codes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "功能编号列表（优先级最高），如 ['2437']",
+            },
+            "module": {
+                "type": "string",
+                "description": "模块名称（次优先级），如 'user'",
             },
         },
         "required": ["project", "question"],
@@ -450,16 +527,20 @@ def register_memory_tools(gateway_mcp):
     """向 FastMCP 注册记忆管理工具"""
     from mcp import types
 
-    async def upload_memory(ctx, project: str, filename: str, content: str):
+    async def upload_memory(ctx, project: str, filename: str, content: str,
+                           feature_codes: List[str] = None, module: str = None):
         """上传记忆文件"""
-        result = upload_memory_impl(project, filename, content)
+        result = upload_memory_impl(project, filename, content,
+                                   feature_codes=feature_codes, module=module)
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
         )
 
-    async def ask_project(ctx, project: str, question: str, top_k: int = 5):
+    async def ask_project(ctx, project: str, question: str, top_k: int = 5,
+                         feature_codes: List[str] = None, module: str = None):
         """项目问答"""
-        result = ask_project_impl(project, question, top_k)
+        result = ask_project_impl(project, question, top_k,
+                                 feature_codes=feature_codes, module=module)
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
         )
