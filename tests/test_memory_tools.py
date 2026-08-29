@@ -64,7 +64,8 @@ class TestMemoryManager(unittest.TestCase):
         self.assertEqual(kb_id, "789")
 
     @patch("urllib.request.urlopen")
-    def test_upload_memory(self, mock_urlopen):
+    @patch("time.sleep")
+    def test_upload_memory(self, mock_sleep, mock_urlopen):
         """测试上传记忆文件"""
         # Mock login
         login_resp = MagicMock()
@@ -102,7 +103,28 @@ class TestMemoryManager(unittest.TestCase):
         chunk_resp.__enter__ = lambda s: s
         chunk_resp.__exit__ = MagicMock(return_value=False)
 
-        mock_urlopen.side_effect = [login_resp, list_resp, upload_resp, chunk_resp]
+        # Mock get chunks (for confidence calculation)
+        chunks_resp = MagicMock()
+        chunks_resp.read.return_value = json.dumps({
+            "code": "0",
+            "data": {"records": [{"id": "300"}, {"id": "301"}]},
+        }).encode("utf-8")
+        chunks_resp.__enter__ = lambda s: s
+        chunks_resp.__exit__ = MagicMock(return_value=False)
+
+        # Mock calculate confidence (for each chunk)
+        conf_resp = MagicMock()
+        conf_resp.read.return_value = json.dumps({
+            "code": "0",
+            "data": 5,
+        }).encode("utf-8")
+        conf_resp.__enter__ = lambda s: s
+        conf_resp.__exit__ = MagicMock(return_value=False)
+
+        mock_urlopen.side_effect = [
+            login_resp, list_resp, upload_resp, chunk_resp,
+            chunks_resp, conf_resp, conf_resp  # chunks + 2x confidence
+        ]
 
         manager = MemoryManager(MemoryConfig())
         result = manager.upload_memory("TestProject", "test.md", "# Test Content")

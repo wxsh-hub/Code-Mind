@@ -102,6 +102,24 @@ class RAGClient:
         self.ensure_logged_in()
         self._request("POST", f"/knowledge-base/chunks/{chunk_id}/deprecate")
 
+    def calculate_confidence(self, chunk_id: str) -> int:
+        """计算并更新 chunk 置信度"""
+        self.ensure_logged_in()
+        resp = self._request("POST", f"/knowledge-base/chunks/{chunk_id}/calculate-confidence")
+        return resp.get("data", 1)
+
+    def get_confidence(self, chunk_id: str) -> int:
+        """获取 chunk 置信度"""
+        self.ensure_logged_in()
+        resp = self._request("GET", f"/knowledge-base/chunks/{chunk_id}/confidence")
+        return resp.get("data", 1)
+
+    def normalize_confidence(self, chunk_ids: List[str]) -> List[Dict[str, Any]]:
+        """批量归一化置信度到100 总分"""
+        self.ensure_logged_in()
+        resp = self._request("POST", "/knowledge-base/chunks/normalize-confidence", chunk_ids)
+        return resp.get("data", [])
+
     def rag_chat(self, question: str, max_tokens: int = 2000) -> str:
         """RAG 问答（SSE 流式）"""
         self.ensure_logged_in()

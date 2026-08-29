@@ -141,8 +141,16 @@ class MemoryManager:
         logger.info(f"Created knowledge base for project '{project_name}': {kb_id}")
         return kb_id
 
-    def upload_memory(self, project_name: str, filename: str, content: str) -> Dict[str, Any]:
-        """上传记忆文件到项目知识库"""
+    def upload_memory(self, project_name: str, filename: str, content: str,
+                      calculate_confidence: bool = True) -> Dict[str, Any]:
+        """上传记忆文件到项目知识库
+
+        Args:
+            project_name: 项目名称
+            filename: 文件名
+            content: 文件内容
+            calculate_confidence: 是否计算置信度（默认 True）
+        """
         self.ensure_logged_in()
 
         # 获取或创建项目知识库
@@ -165,6 +173,23 @@ class MemoryManager:
             if doc_id:
                 # 触发分块
                 self._request("POST", f"/knowledge-base/docs/{doc_id}/chunk")
+
+                # 计算置信度（如果有分块）
+                if calculate_confidence:
+                    import time
+                    time.sleep(5)  # 等待分块完成
+                    # 获取分块列表并计算置信度
+                    chunks_resp = self._request("GET", f"/knowledge-base/docs/{doc_id}/chunks")
+                    chunks = chunks_resp.get("data", {})
+                    records = chunks.get("records", []) if isinstance(chunks, dict) else []
+                    for chunk in records:
+                        chunk_id = chunk.get("id")
+                        if chunk_id:
+                            try:
+                                self._request("POST", f"/knowledge-base/chunks/{chunk_id}/calculate-confidence")
+                            except Exception:
+                                pass
+
                 return {
                     "status": "success",
                     "project": project_name,
@@ -180,8 +205,16 @@ class MemoryManager:
         finally:
             os.unlink(temp_path)
 
-    def ask_project(self, project_name: str, question: str, top_k: int = 5) -> Dict[str, Any]:
-        """向项目知识库提问"""
+    def ask_project(self, project_name: str, question: str, top_k: int = 5,
+                    normalize: bool = True) -> Dict[str, Any]:
+        """向项目知识库提问
+
+        Args:
+            project_name: 项目名称
+            question: 问题
+            top_k: 返回数量
+            normalize: 是否归一化置信度到100 分（默认 True）
+        """
         self.ensure_logged_in()
 
         # 获取项目知识库
@@ -205,11 +238,42 @@ class MemoryManager:
                 except Exception:
                     pass
 
+        # 归一化置信度
+        confidence_map = {}
+        if normalize and results:
+            chunk_ids = [r.get("chunkId") for r in results if r.get("chunkId")]
+            if chunk_ids:
+                try:
+                    normalized = self._request("POST", "/knowledge-base/chunks/normalize-confidence", chunk_ids)
+                    for item in normalized.get("data", []):
+                        confidence_map[item.get("chunkId")] = {
+                            "confidence": item.get("confidence", 1),
+                            "normalizedScore": item.get("normalizedScore", 0),
+                        }
+                except Exception:
+                    pass
+
+        # 组装结果
+        enriched_results = []
+        for item in results:
+            chunk_id = item.get("chunkId")
+            conf = confidence_map.get(chunk_id, {})
+            enriched_results.append({
+                "chunkId": chunk_id,
+                "content": item.get("content", ""),
+                "docId": item.get("docId"),
+                "kbId": item.get("kbId"),
+                "metadata": item.get("metadata", {}),
+                "confidence": conf.get("confidence", 1),
+                "normalizedScore": conf.get("normalizedScore", 0),
+            })
+
         return {
             "project": project_name,
             "question": question,
-            "results": results,
-            "count": len(results),
+            "results": enriched_results,
+            "count": len(enriched_results),
+            "totalConfidence": sum(r.get("confidence", 1) for r in enriched_results),
         }
 
     def list_projects(self) -> List[Dict[str, Any]]:
