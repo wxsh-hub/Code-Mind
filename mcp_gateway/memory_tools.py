@@ -133,31 +133,27 @@ class MemoryManager:
                 return str(kb["id"])
 
         # 创建新知识库
-        try:
-            resp = self._request("POST", "/knowledge-base", {
-                "name": f"memory_{project_name}",
-                "embeddingModel": "qwen-emb-8b",
-                "collectionName": f"memory_{project_name}_col",
-            })
-            kb_id = resp.get("data")
-            if not kb_id:
-                raise RuntimeError(f"Failed to create knowledge base: {resp}")
-            kb_id = str(kb_id)
-            self._project_cache[project_name] = kb_id
-            logger.info(f"Created knowledge base for project '{project_name}': {kb_id}")
-            return kb_id
-        except RuntimeError as e:
-            # 如果知识库已存在，重新查询列表获取ID
-            if "已存在" in str(e) or "already exists" in str(e):
-                logger.info(f"Knowledge base already exists, fetching from list")
-                resp = self._request("GET", "/knowledge-base")
-                kb_page = resp.get("data") or {}
-                kb_list = kb_page.get("records", []) if isinstance(kb_page, dict) else []
-                for kb in kb_list:
-                    if kb.get("name") == f"memory_{project_name}":
-                        self._project_cache[project_name] = str(kb["id"])
-                        return str(kb["id"])
-            raise
+        resp = self._request("POST", "/knowledge-base", {
+            "name": f"memory_{project_name}",
+            "embeddingModel": "qwen-emb-8b",
+            "collectionName": f"memory_{project_name}_col",
+        })
+        kb_id = resp.get("data")
+        if not kb_id:
+            # 可能是知识库已存在，重新查询
+            logger.info(f"Knowledge base creation returned null, fetching from list")
+            resp = self._request("GET", "/knowledge-base")
+            kb_page = resp.get("data") or {}
+            kb_list = kb_page.get("records", []) if isinstance(kb_page, dict) else []
+            for kb in kb_list:
+                if kb.get("name") == f"memory_{project_name}":
+                    self._project_cache[project_name] = str(kb["id"])
+                    return str(kb["id"])
+            raise RuntimeError(f"Failed to create knowledge base: {resp}")
+        kb_id = str(kb_id)
+        self._project_cache[project_name] = kb_id
+        logger.info(f"Created knowledge base for project '{project_name}': {kb_id}")
+        return kb_id
 
     def upload_memory(self, project_name: str, filename: str, content: str,
                       calculate_confidence: bool = True,
