@@ -25,6 +25,8 @@ from mcp_gateway.rag_tools import register_rag_tools
 from mcp_gateway.memory_tools import register_memory_tools
 from mcp_gateway.skill_tools import register_skill_tools
 from mcp_gateway.feature_tools import register_feature_tools
+from mcp_gateway.discovery_tools import register_discovery_tools
+from mcp_gateway.conflict_review import register_conflict_review_tools
 # --- Global Config for Args ---
 cli_args = None
 log_level = os.environ.get("LOGLEVEL", "INFO").upper()
@@ -461,6 +463,20 @@ async def lifespan(server: FastMCP) -> AsyncIterator[GatewayContext]:
         logger.info("Feature tools registered successfully")
     except Exception as e:
         logger.warning(f"Failed to register feature tools: {e}")
+
+    # Register Discovery tools (list_mcp_tools)
+    try:
+        register_discovery_tools(server)
+        logger.info("Discovery tools registered successfully")
+    except Exception as e:
+        logger.warning(f"Failed to register discovery tools: {e}")
+
+    # Register Conflict Review tools (list_conflicts, review_conflict)
+    try:
+        register_conflict_review_tools(server)
+        logger.info("Conflict review tools registered successfully")
+    except Exception as e:
+        logger.warning(f"Failed to register conflict review tools: {e}")
 
     try:
         # Yield the context containing servers and plugin manager

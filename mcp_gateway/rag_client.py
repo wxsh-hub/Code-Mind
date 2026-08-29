@@ -252,3 +252,15 @@ class RAGClient:
         self.ensure_logged_in()
         resp = self._request("DELETE", f"/knowledge-base/chunks/by-module/{module}")
         return resp.get("data", {})
+
+    def delete_document(self, doc_id: str) -> Dict[str, Any]:
+        """删除文档及其所有向量"""
+        self.ensure_logged_in()
+        resp = self._request("DELETE", f"/knowledge-base/docs/{doc_id}")
+        return resp.get("data", {})
+
+    def delete_knowledge_base(self, kb_id: str) -> Dict[str, Any]:
+        """删除整个知识库"""
+        self.ensure_logged_in()
+        resp = self._request("DELETE", f"/knowledge-base/{kb_id}")
+        return resp.get("data", {})

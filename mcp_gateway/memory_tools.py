@@ -446,6 +446,55 @@ def list_projects_impl() -> Dict[str, Any]:
     return {"projects": projects, "count": len(projects)}
 
 
+def delete_memory_impl(project: str, filename: Optional[str] = None) -> Dict[str, Any]:
+    """删除记忆文件或整个项目
+
+    Args:
+        project: 项目名称
+        filename: 文件名（为空时删除整个项目）
+
+    Returns:
+        删除结果
+    """
+    manager = get_manager()
+    manager.ensure_logged_in()
+
+    try:
+        kb_id = manager.get_or_create_project_kb(project)
+
+        if filename:
+            # 按文件名删除
+            # 查询该文件的文档
+            docs_resp = manager._request("GET", f"/knowledge-base/{kb_id}/docs")
+            docs = docs_resp.get("data", {})
+            records = docs.get("records", []) if isinstance(docs, dict) else []
+
+            deleted_count = 0
+            for doc in records:
+                if doc.get("docName") == filename:
+                    doc_id = doc.get("id")
+                    if doc_id:
+                        manager._request("DELETE", f"/knowledge-base/docs/{doc_id}")
+                        deleted_count += 1
+
+            return {
+                "status": "success",
+                "project": project,
+                "filename": filename,
+                "deleted_docs": deleted_count,
+            }
+        else:
+            # 删除整个知识库
+            manager._request("DELETE", f"/knowledge-base/{kb_id}")
+            return {
+                "status": "success",
+                "project": project,
+                "deleted_kb": kb_id,
+            }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
 # MCP Tool 元数据
 
 UPLOAD_MEMORY_TOOL = {
@@ -522,6 +571,25 @@ LIST_PROJECTS_TOOL = {
     },
 }
 
+DELETE_MEMORY_TOOL = {
+    "name": "delete_memory",
+    "description": "删除记忆文件或整个项目知识库",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "project": {
+                "type": "string",
+                "description": "项目名称",
+            },
+            "filename": {
+                "type": "string",
+                "description": "文件名（为空时删除整个项目）",
+            },
+        },
+        "required": ["project"],
+    },
+}
+
 
 def register_memory_tools(gateway_mcp):
     """向 FastMCP 注册记忆管理工具"""
@@ -552,6 +620,13 @@ def register_memory_tools(gateway_mcp):
             content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
         )
 
+    async def delete_memory(ctx, project: str, filename: str = None):
+        """删除记忆文件或整个项目"""
+        result = delete_memory_impl(project, filename)
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+        )
+
     # 设置元数据
     upload_memory.__name__ = "upload_memory"
     upload_memory.__doc__ = UPLOAD_MEMORY_TOOL["description"]
@@ -566,5 +641,6 @@ def register_memory_tools(gateway_mcp):
     gateway_mcp.tool(name="upload_memory", description=UPLOAD_MEMORY_TOOL["description"])(upload_memory)
     gateway_mcp.tool(name="ask_project", description=ASK_PROJECT_TOOL["description"])(ask_project)
     gateway_mcp.tool(name="list_projects", description=LIST_PROJECTS_TOOL["description"])(list_projects)
+    gateway_mcp.tool(name="delete_memory", description=DELETE_MEMORY_TOOL["description"])(delete_memory)
 
-    logger.info("Registered memory tools: upload_memory, ask_project, list_projects")
+    logger.info("Registered memory tools: upload_memory, ask_project, list_projects, delete_memory")

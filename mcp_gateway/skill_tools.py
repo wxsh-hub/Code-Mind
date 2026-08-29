@@ -428,6 +428,55 @@ class SkillStore:
 
         return None
 
+    def delete_skill(self, project: str, skill_name: str,
+                     category: str = None) -> Dict[str, Any]:
+        """删除技能"""
+        self.ensure_logged_in()
+
+        project_dir = self.base_dir / project
+        if not project_dir.exists():
+            return {"status": "error", "error": "项目不存在"}
+
+        # 搜索所有分类
+        categories = [category] if category else [
+            d.name for d in project_dir.iterdir() if d.is_dir()
+        ]
+
+        deleted_files = []
+        for cat in categories:
+            safe_name = skill_name.replace(" ", "_").replace("/", "_")
+            skill_file = project_dir / cat / f"{safe_name}.md"
+
+            if skill_file.exists():
+                # 删除本地文件
+                skill_file.unlink()
+                deleted_files.append(str(skill_file))
+
+                # 删除向量库中的对应向量
+                try:
+                    kb_id = self.get_or_create_skill_kb(project)
+                    # 搜索并删除包含该技能名的向量
+                    search_resp = self._request("POST", "/knowledge-base/search/similar", {
+                        "query": skill_name,
+                        "kbId": kb_id,
+                        "topK": 100,
+                    })
+                    for chunk in search_resp.get("data", []):
+                        if skill_name.lower() in chunk.get("content", "").lower():
+                            self._request("DELETE", f"/knowledge-base/chunks/{chunk.get('chunkId')}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete vectors: {e}")
+
+        if deleted_files:
+            return {
+                "status": "success",
+                "project": project,
+                "skill_name": skill_name,
+                "deleted_files": deleted_files,
+            }
+        else:
+            return {"status": "error", "error": "技能不存在"}
+
 
 # 全局存储实例
 _store: Optional[SkillStore] = None
@@ -474,6 +523,12 @@ def get_skill_impl(project: str, skill_name: str, category: str = None) -> Optio
     """获取指定技能详情"""
     store = get_store()
     return store.get_skill(project, skill_name, category)
+
+
+def delete_skill_impl(project: str, skill_name: str, category: str = None) -> Dict[str, Any]:
+    """删除技能"""
+    store = get_store()
+    return store.delete_skill(project, skill_name, category)
 
 
 # MCP Tool 元数据
@@ -537,6 +592,20 @@ GET_SKILL_TOOL = {
     },
 }
 
+DELETE_SKILL_TOOL = {
+    "name": "delete_skill",
+    "description": "删除技能（同时删除本地文件和向量）",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "project": {"type": "string", "description": "项目名称"},
+            "skill_name": {"type": "string", "description": "技能名称"},
+            "category": {"type": "string", "description": "分类（可选）"},
+        },
+        "required": ["project", "skill_name"],
+    },
+}
+
 
 def register_skill_tools(gateway_mcp):
     """向 FastMCP 注册技能管理工具"""
@@ -573,6 +642,13 @@ def register_skill_tools(gateway_mcp):
             content=[types.TextContent(type="text", text=json.dumps(result or {}, ensure_ascii=False))]
         )
 
+    async def delete_skill(ctx, project: str, skill_name: str, category: str = None):
+        """删除技能"""
+        result = delete_skill_impl(project, skill_name, category)
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+        )
+
     # 设置元数据
     upload_skill.__name__ = "upload_skill"
     upload_skill.__doc__ = UPLOAD_SKILL_TOOL["description"]
@@ -586,10 +662,14 @@ def register_skill_tools(gateway_mcp):
     get_skill.__name__ = "get_skill"
     get_skill.__doc__ = GET_SKILL_TOOL["description"]
 
+    delete_skill.__name__ = "delete_skill"
+    delete_skill.__doc__ = DELETE_SKILL_TOOL["description"]
+
     # 注册工具
     gateway_mcp.tool(name="upload_skill", description=UPLOAD_SKILL_TOOL["description"])(upload_skill)
     gateway_mcp.tool(name="search_skill", description=SEARCH_SKILL_TOOL["description"])(search_skill)
     gateway_mcp.tool(name="list_skills", description=LIST_SKILLS_TOOL["description"])(list_skills)
     gateway_mcp.tool(name="get_skill", description=GET_SKILL_TOOL["description"])(get_skill)
+    gateway_mcp.tool(name="delete_skill", description=DELETE_SKILL_TOOL["description"])(delete_skill)
 
-    logger.info("Registered skill tools: upload_skill, search_skill, list_skills, get_skill")
+    logger.info("Registered skill tools: upload_skill, search_skill, list_skills, get_skill, delete_skill")
