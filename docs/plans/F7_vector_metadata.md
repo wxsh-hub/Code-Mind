@@ -36,7 +36,7 @@ CREATE TABLE t_feature_metadata (
     id VARCHAR(64) PRIMARY KEY,
     feature_code VARCHAR(32) NOT NULL UNIQUE COMMENT '功能编号，如 2437',
     feature_name VARCHAR(128) NOT NULL COMMENT '功能名称',
-    module_id VARCHAR(64) COMMENT '关联模块 ID',
+    module_name VARCHAR(64) COMMENT '所属模块名称，如 user、order',
     description TEXT COMMENT '功能描述',
     status VARCHAR(16) DEFAULT 'active' COMMENT '状态：active/deprecated',
     created_by VARCHAR(64),
@@ -46,7 +46,7 @@ CREATE TABLE t_feature_metadata (
 );
 
 CREATE INDEX idx_fm_feature_code ON t_feature_metadata(feature_code);
-CREATE INDEX idx_fm_module_id ON t_feature_metadata(module_id);
+CREATE INDEX idx_fm_module_name ON t_feature_metadata(module_name);
 ```
 
 ### 3. 向量元数据字段（扩展现有表）
@@ -125,10 +125,43 @@ DELETE /api/ragent/modules/{id}               # 删除模块（级联删除功�
 
 ```
 POST   /api/ragent/feature-metadata           # 创建功能
-GET    /api/ragent/feature-metadata           # 列出所有功能
+GET    /api/ragent/feature-metadata           # 列出所有功能（可按模块过滤）
 GET    /api/ragent/feature-metadata/{code}    # 查询功能
 PUT    /api/ragent/feature-metadata/{code}    # 更新功能
 DELETE /api/ragent/feature-metadata/{code}    # 删除功能（级联删除向量）
+```
+
+#### 创建功能（必须带模块名）
+```json
+POST /api/ragent/feature-metadata
+{
+    "featureCode": "2437",
+    "featureName": "人员管理",
+    "moduleName": "user",
+    "description": "新增、编辑、删除人员的功能"
+}
+```
+
+#### 查询功能（返回包含模块名）
+```json
+GET /api/ragent/feature-metadata/2437
+
+响应：
+{
+    "code": "0",
+    "data": {
+        "featureCode": "2437",
+        "featureName": "人员管理",
+        "moduleName": "user",
+        "description": "...",
+        "status": "active"
+    }
+}
+```
+
+#### 按模块列出功能
+```json
+GET /api/ragent/feature-metadata?module=user
 ```
 
 ### 3. 向量上传（带元数据）
