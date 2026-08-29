@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mcp-gateway": {
+      "command": "python",
+      "args": ["-m", "mcp_gateway.gateway", "--mcp-json-path", "tests/test_mcp.json"],
+      "servers": {}
+    }
+  }
+}

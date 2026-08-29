@@ -1,0 +1,12 @@
+ai:
+  providers:
+    bailian:
+      api-key: sk-ws-H.EXRRLER.M7hA.MEQCICBRV094j86gGeT_xXL3IS4INaZhcjELgHLbX6MRRLUHAiAdEIfjkUsi6AUY9CpXR3lCZFerQWUq1OAEpjk83A_4jA
+    siliconflow:
+      api-key: sk-bgjmqvxuivmjzrapzdmpqvfwpumrebswxjuynbxfvzicbeto
+
+rag:
+  mcp:
+    servers:
+      - name: experience-gateway
+        url: http://localhost:8000  # MCP Gateway 地址（用于企业经验检索）
