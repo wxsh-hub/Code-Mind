@@ -11,6 +11,38 @@
 
 ---
 
+## 置信度方案
+
+### 问题
+
+当前置信度 = 上传次数，有问题：
+- 旧内容上传多次 → 置信度高（但可能过时）
+- 新内容上传一次 → 置信度低（但可能更准确）
+
+### 方案：返回原始数据，AI 判断
+
+返回字段：
+```json
+{
+    "content": "...",
+    "metadata": {
+        "upload_count": 10,        // 上传次数
+        "last_upload": "2026-08-29", // 最后上传时间
+        "days_old": 5,             // 天数
+        "confidence": 10           // 原始置信度
+    }
+}
+```
+
+AI 判断逻辑：
+```
+问"怎么做" → 优先最新的（last_upload）
+问"最佳实践" → 优先最频繁的（upload_count）
+问"历史" → 优先最老的
+```
+
+---
+
 ## 数据模型
 
 ### 1. 模块表（新表）
@@ -51,13 +83,22 @@ CREATE INDEX idx_fm_module_name ON t_feature_metadata(module_name);
 
 ### 3. 向量元数据字段（扩展现有表）
 
-在 `t_knowledge_chunk` 表添加 JSONB 字段：
+在 `t_knowledge_chunk` 表添加字段：
 
 ```sql
+-- JSONB 元数据
 ALTER TABLE t_knowledge_chunk
     ADD COLUMN metadata JSONB DEFAULT '{}';
 
 CREATE INDEX idx_kc_metadata ON t_knowledge_chunk USING GIN (metadata);
+
+-- 上传统计字段
+ALTER TABLE t_knowledge_chunk
+    ADD COLUMN upload_count INT DEFAULT 1 COMMENT '上传次数',
+    ADD COLUMN last_upload_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '最后上传时间';
+
+CREATE INDEX idx_kc_upload_count ON t_knowledge_chunk(upload_count);
+CREATE INDEX idx_kc_last_upload ON t_knowledge_chunk(last_upload_at);
 ```
 
 **存储格式示例**：
@@ -66,7 +107,10 @@ CREATE INDEX idx_kc_metadata ON t_knowledge_chunk USING GIN (metadata);
     "feature_codes": ["2437", "2438"],
     "module": "user",
     "type": "api",
-    "version": "1.0"
+    "version": "1.0",
+    "upload_count": 10,
+    "last_upload": "2026-08-29",
+    "days_old": 5
 }
 ```
 
@@ -185,7 +229,25 @@ POST /api/ragent/knowledge-base/search/similar
 - `module`：模块过滤
 
 返回新增字段：
-- `level`：检索级别（feature/module/global）
+```json
+{
+    "level": "feature",
+    "results": [
+        {
+            "chunkId": "123",
+            "content": "...",
+            "metadata": {
+                "feature_codes": ["2437"],
+                "module": "user"
+            },
+            "upload_count": 10,
+            "last_upload": "2026-08-29",
+            "days_old": 5,
+            "confidence": 10
+        }
+    ]
+}
+```
 
 ### 5. 按编号删除向量
 
