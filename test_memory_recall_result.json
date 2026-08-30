@@ -1,0 +1,122 @@
+{
+  "short_keyword_tests": [
+    {
+      "keyword": "MCP",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "RAG",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "pgvector",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "Redis",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "RocketMQ",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "置信度",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "向量",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "矛盾",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "模块",
+      "status": "PASS",
+      "found": true
+    },
+    {
+      "keyword": "功能",
+      "status": "PASS",
+      "found": true
+    }
+  ],
+  "content_based_tests": [
+    {
+      "question": "集成设计",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "Chunk API",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "MCP Gateway",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "文件位置",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "metadata",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "快速入门",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "RAG 状态",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "技术栈",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "MCP 工具",
+      "status": "PASS",
+      "hit_rate": 1.0
+    },
+    {
+      "question": "数据库表",
+      "status": "PASS",
+      "hit_rate": 1.0
+    }
+  ],
+  "summary": {
+    "short_keyword": {
+      "passed": 10,
+      "failed": 0,
+      "total": 10
+    },
+    "content_based": {
+      "passed": 10,
+      "failed": 0,
+      "total": 10
+    },
+    "total": {
+      "passed": 20,
+      "failed": 0
+    }
+  }
+}

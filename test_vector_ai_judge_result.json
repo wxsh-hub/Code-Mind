@@ -1,0 +1,35 @@
+{
+  "ai_judge_results": [
+    {
+      "question": "项目使用什么数据库？",
+      "status": "CORRECT_WITH_WARNING",
+      "answer": "项目实际使用的数据库是 **PostgreSQL 16**。\n\n多份资料中明确指出，虽然存在一些错误或过时的文档提到使用 MySQL 8.0，但这些信息已被标注为错误，并说明“实际使用 PostgreSQL”或“已迁移到 PostgreSQL”[2](#cite-2)[3](#cite-3)[4](#cite-4)[5](#cite-5)[6](#cite-6)[7](#cite-7)[8](#c"
+    },
+    {
+      "question": "Spring Boot 版本是多少？",
+      "status": "CORRECT",
+      "answer": "当前使用的 Spring Boot 版本是 **4.1**。[2](#cite-2)[5](#cite-5)[6](#cite-6)[7](#cite-7)[8](#cite-8)[9](#cite-9)[10](#cite-10)"
+    },
+    {
+      "question": "JDK 版本是多少？",
+      "status": "CORRECT_WITH_WARNING",
+      "answer": "当前实际使用的 JDK 版本是 **JDK 17**。[5](#cite-5)\n\n多份过时文档中提到的 JDK 8 已被明确标注为“错误”或“已升级”，并指出实际使用的是 JDK 17。[2](#cite-2)[3](#cite-3)[6](#cite-6)[7](#cite-7)"
+    },
+    {
+      "question": "使用什么缓存？",
+      "status": "CORRECT_WITH_WARNING",
+      "answer": "当前使用的缓存是 **Redis**。\n\n多份资料明确指出，原先使用的 Memcached 已被替换为 Redis：\n\n- 在错误配置示例中提到：“使用 Memcached（错误：应该使用 Redis）”[2](#cite-2)。\n- 多个过时技术栈文档均说明：“缓存：Memcached（已替换为 Redis）”[3](#cite-3)[4](#cite-4)，或“基础设施：Memcached（已"
+    },
+    {
+      "question": "前端框架是什么？",
+      "status": "CORRECT",
+      "answer": "当前使用的前端框架是 **React 18**。[5](#cite-5)[6](#cite-6)[9](#cite-9)[10](#cite-10)"
+    }
+  ],
+  "deleted_count": 8,
+  "summary": {
+    "total": 5,
+    "correct": 5,
+    "accuracy": "100.0%"
+  }
+}

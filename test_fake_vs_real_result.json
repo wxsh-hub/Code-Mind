@@ -1,0 +1,68 @@
+{
+  "fake_memories": [
+    {
+      "filename": "fake_tech_stack.md",
+      "reason": "技术栈信息过时，全部使用了旧版本"
+    },
+    {
+      "filename": "fake_api_design.md",
+      "reason": "API 设计规范完全错误"
+    },
+    {
+      "filename": "fake_database.md",
+      "reason": "数据库选型和表结构完全错误"
+    },
+    {
+      "filename": "fake_deployment.md",
+      "reason": "部署方式完全过时"
+    }
+  ],
+  "real_memories": [
+    "MEMORY.md",
+    "QUICK_START.md",
+    "integration-design.md",
+    "mcp-gateway-status.md",
+    "mcp-gateway-files.md",
+    "chunk-api-status.md",
+    "metadata-status.md",
+    "rag-status.md"
+  ],
+  "conflict_tests": [
+    {
+      "question": "PostgreSQL",
+      "status": "CORRECT",
+      "found_real": true,
+      "found_fake": true
+    },
+    {
+      "question": "Spring Boot",
+      "status": "CORRECT",
+      "found_real": true,
+      "found_fake": true
+    },
+    {
+      "question": "Sa-Token",
+      "status": "CORRECT",
+      "found_real": true,
+      "found_fake": true
+    },
+    {
+      "question": "JDK 17",
+      "status": "CORRECT",
+      "found_real": true,
+      "found_fake": true
+    },
+    {
+      "question": "React",
+      "status": "CORRECT",
+      "found_real": true,
+      "found_fake": true
+    }
+  ],
+  "deleted_fake_count": 28,
+  "summary": {
+    "conflict_passed": 5,
+    "conflict_failed": 0,
+    "fake_deleted": 28
+  }
+}

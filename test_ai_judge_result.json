@@ -1,0 +1,103 @@
+{
+  "similarity_tests": {
+    "results": [
+      {
+        "query": "数据库",
+        "status": "CORRECT",
+        "found_correct": true,
+        "found_wrong": true
+      },
+      {
+        "query": "认证",
+        "status": "MISS",
+        "found_correct": false,
+        "found_wrong": false
+      },
+      {
+        "query": "前端",
+        "status": "CORRECT",
+        "found_correct": true,
+        "found_wrong": true
+      },
+      {
+        "query": "缓存",
+        "status": "CORRECT",
+        "found_correct": true,
+        "found_wrong": true
+      },
+      {
+        "query": "消息队列",
+        "status": "CORRECT",
+        "found_correct": true,
+        "found_wrong": false
+      },
+      {
+        "query": "向量存储",
+        "status": "NO_RESULT"
+      },
+      {
+        "query": "对象存储",
+        "status": "CORRECT",
+        "found_correct": true,
+        "found_wrong": false
+      },
+      {
+        "query": "构建工具",
+        "status": "NO_RESULT"
+      },
+      {
+        "query": "ORM框架",
+        "status": "NO_RESULT"
+      },
+      {
+        "query": "网关",
+        "status": "CORRECT",
+        "found_correct": true,
+        "found_wrong": false
+      }
+    ],
+    "passed": 6,
+    "failed": 4
+  },
+  "keyword_tests": {
+    "results": [
+      {
+        "query": "PostgreSQL",
+        "status": "PASS"
+      },
+      {
+        "query": "pgvector",
+        "status": "PASS"
+      },
+      {
+        "query": "Sa-Token",
+        "status": "NO_RESULT"
+      },
+      {
+        "query": "RocketMQ",
+        "status": "PASS"
+      },
+      {
+        "query": "Redis",
+        "status": "PASS"
+      }
+    ],
+    "passed": 4,
+    "failed": 1
+  },
+  "ai_judge_tests": [
+    {
+      "question": "项目使用什么数据库？请说明正确的技术选型。",
+      "status": "MIXED"
+    },
+    {
+      "question": "项目使用什么缓存？请说明正确的技术选型。",
+      "status": "MIXED"
+    },
+    {
+      "question": "项目使用什么前端框架？请说明正确的技术选型。",
+      "status": "MIXED"
+    }
+  ],
+  "ai_deleted_count": 3
+}
