@@ -37,22 +37,47 @@ class MemoryManager:
         self._project_cache: Dict[str, str] = {}  # project_name -> kb_id
 
     def _request(self, method: str, path: str, data: Optional[dict] = None) -> dict:
-        """发送 HTTP 请求"""
+        """发送 HTTP 请求（带重试）"""
+        import time as _time
+        # 直接使用路径，不进行额外编码（调用方已处理编码）
         url = f"{self.config.base_url}{path}"
         headers = {"Content-Type": "application/json; charset=UTF-8"}
         if self._token:
             headers["Authorization"] = self._token
 
         body = json.dumps(data).encode("utf-8") if data else None
-        req = urllib.request.Request(url, data=body, headers=headers, method=method)
 
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            body_text = e.read().decode("utf-8", errors="replace")
-            logger.error(f"HTTP {e.code}: {body_text}")
-            raise RuntimeError(f"HTTP {e.code}: {body_text}")
+        last_error = None
+        for attempt in range(3):
+            req = urllib.request.Request(url, data=body, headers=headers, method=method)
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    result = json.loads(resp.read().decode("utf-8"))
+                    # 检查业务错误码
+                    if result.get("code") and result.get("code") != "0":
+                        error_msg = result.get("message", "")
+                        if "数据访问" in error_msg or "系统执行" in error_msg:
+                            if attempt < 2:
+                                logger.warning(f"Business error on attempt {attempt+1}, retrying: {error_msg}")
+                                _time.sleep(1)
+                                continue
+                    return result
+            except urllib.error.HTTPError as e:
+                body_text = e.read().decode("utf-8", errors="replace")
+                logger.error(f"HTTP {e.code}: {body_text}")
+                if attempt < 2:
+                    _time.sleep(1)
+                    continue
+                raise RuntimeError(f"HTTP {e.code}: {body_text}")
+            except Exception as e:
+                last_error = e
+                if attempt < 2:
+                    logger.warning(f"Request failed on attempt {attempt+1}, retrying: {e}")
+                    _time.sleep(1)
+                    continue
+                raise
+
+        raise RuntimeError(f"Request failed after 3 attempts: {last_error}")
 
     def _upload_file(self, path: str, file_path: str,
                      extra_fields: Optional[Dict[str, str]] = None) -> dict:
@@ -115,7 +140,7 @@ class MemoryManager:
             self.login()
 
     def get_or_create_project_kb(self, project_name: str) -> str:
-        """获取或创建项目的知识库"""
+        """获取或创建项目的知识库（支持模糊匹配）"""
         self.ensure_logged_in()
 
         # 检查缓存
@@ -127,8 +152,18 @@ class MemoryManager:
         kb_page = resp.get("data") or {}
         kb_list = kb_page.get("records", []) if isinstance(kb_page, dict) else []
 
+        # 精确匹配
         for kb in kb_list:
             if kb.get("name") == f"memory_{project_name}":
+                self._project_cache[project_name] = str(kb["id"])
+                return str(kb["id"])
+
+        # 模糊匹配（不区分大小写，支持部分匹配）
+        project_lower = project_name.lower()
+        for kb in kb_list:
+            kb_name = kb.get("name", "").lower()
+            if kb_name.startswith("memory_") and project_lower in kb_name:
+                logger.info(f"Fuzzy matched knowledge base: {kb.get('name')}")
                 self._project_cache[project_name] = str(kb["id"])
                 return str(kb["id"])
 
@@ -149,6 +184,11 @@ class MemoryManager:
                 if kb.get("name") == f"memory_{project_name}":
                     self._project_cache[project_name] = str(kb["id"])
                     return str(kb["id"])
+            # 如果仍然找不到，返回第一个匹配的知识库 ID
+            if kb_list:
+                logger.warning(f"Using first knowledge base as fallback: {kb_list[0].get('name')}")
+                self._project_cache[project_name] = str(kb_list[0]["id"])
+                return str(kb_list[0]["id"])
             raise RuntimeError(f"Failed to create knowledge base: {resp}")
         kb_id = str(kb_id)
         self._project_cache[project_name] = kb_id
@@ -201,10 +241,11 @@ class MemoryManager:
             except Exception as e:
                 logger.warning(f"Path resolution failed: {e}")
 
-        # 写入临时文件
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as f:
+        # 写入临时文件（使用用户指定的文件名）
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, filename)
+        with open(temp_path, "w", encoding="utf-8") as f:
             f.write(content)
-            temp_path = f.name
 
         try:
             # 构建上传参数
@@ -256,7 +297,12 @@ class MemoryManager:
         except Exception as e:
             return {"status": "error", "error": str(e)}
         finally:
-            os.unlink(temp_path)
+            # 清理临时目录
+            try:
+                os.unlink(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
 
     def ask_project(self, project_name: str, question: str, top_k: int = 5,
                     normalize: bool = True,
@@ -264,56 +310,134 @@ class MemoryManager:
                     module: Optional[str] = None) -> Dict[str, Any]:
         """向项目知识库提问（支持逐级降级检索）
 
+        流程：
+        1. 如果用户指定了 feature_codes 和 module，直接使用
+        2. 如果未指定，先搜索功能元数据自动识别相关功能
+        3. 用识别到的功能编号过滤搜索 chunk
+
         Args:
             project_name: 项目名称
             question: 问题
             top_k: 返回数量
             normalize: 是否归一化置信度到100 分（默认 True）
-            feature_codes: 功能编号列表（优先级最高）
-            module: 模块名称（次优先级）
+            feature_codes: 功能编号列表（优先级最高，可选）
+            module: 模块名称（次优先级，可选）
         """
         self.ensure_logged_in()
 
         # 获取项目知识库
         kb_id = self.get_or_create_project_kb(project_name)
 
-        # 逐级降级检索
+        # 自动识别功能：如果用户未指定，先搜索功能元数据
+        auto_detected_features = []
+        auto_detected_module = None
+
+        if not feature_codes and not module:
+            try:
+                # 使用 RAGClient 的 search_features 方法
+                from mcp_gateway.rag_client import RAGClient
+                rag_client = RAGClient()
+                rag_client._token = self._token  # 复用 token
+
+                features = rag_client.search_features(question, limit=3)
+                if features:
+                    auto_detected_features = [f.get("featureCode") for f in features if f.get("featureCode")]
+                    # 取第一个功能的模块作为模块过滤
+                    if features[0].get("moduleName"):
+                        auto_detected_module = features[0].get("moduleName")
+                    logger.info(f"Auto-detected features: {auto_detected_features}, module: {auto_detected_module}")
+            except Exception as e:
+                logger.warning(f"Failed to auto-detect features: {e}")
+
+        # 使用用户指定的或自动识别的参数
+        effective_feature_codes = feature_codes or (auto_detected_features if auto_detected_features else None)
+        effective_module = module or auto_detected_module
+
+        # 逐级降级检索（混合模式：先 LIKE 后向量）
         level = "global"
         results = []
 
-        # [1] 功能级检索
-        if feature_codes:
+        # [1] 功能级检索（LIKE）
+        if effective_feature_codes:
             resp = self._request("POST", "/knowledge-base/search/similar", {
                 "query": question,
                 "kbId": kb_id,
                 "topK": top_k,
-                "featureCodes": ",".join(feature_codes),
+                "featureCodes": ",".join(effective_feature_codes),
             })
-            results = resp.get("data", [])
+            results = resp.get("data") or []
             if results:
                 level = "feature"
+                logger.info(f"Feature-level LIKE search returned {len(results)} results")
 
-        # [2] 模块级检索
-        if not results and module:
+        # [2] 模块级检索（LIKE）
+        if not results and effective_module:
             resp = self._request("POST", "/knowledge-base/search/similar", {
                 "query": question,
                 "kbId": kb_id,
                 "topK": top_k,
-                "module": module,
+                "module": effective_module,
             })
-            results = resp.get("data", [])
+            results = resp.get("data") or []
             if results:
                 level = "module"
+                logger.info(f"Module-level LIKE search returned {len(results)} results")
 
-        # [3] 全库检索
+        # [3] 全库检索（LIKE）
         if not results:
             resp = self._request("POST", "/knowledge-base/search/similar", {
                 "query": question,
                 "kbId": kb_id,
                 "topK": top_k,
             })
-            results = resp.get("data", [])
-            level = "global"
+            results = resp.get("data") or []
+            if results:
+                level = "global"
+                logger.info(f"Global LIKE search returned {len(results)} results")
+
+        # [4] 向量检索（如果 LIKE 无结果）
+        if not results:
+            try:
+                # 使用 rag_chat 进行向量检索
+                from mcp_gateway.rag_client import RAGClient
+                rag_client = RAGClient()
+                rag_client._token = self._token
+
+                # 构造带过滤条件的问题
+                filter_question = question
+                if effective_feature_codes:
+                    filter_question += f" (功能: {','.join(effective_feature_codes)})"
+                if effective_module:
+                    filter_question += f" (模块: {effective_module})"
+
+                # 调用向量检索（通过 rag_chat_with_sources）
+                vector_result = rag_client.rag_chat_with_sources(filter_question)
+                if vector_result and vector_result.get("answer"):
+                    # 从 sources 中构造结果
+                    sources = vector_result.get("sources", [])
+                    for source in sources[:top_k]:
+                        doc_id = source.get("docId")
+                        if doc_id:
+                            # 获取 chunk 信息
+                            chunks = rag_client.get_chunks(doc_id)
+                            if chunks:
+                                records = chunks.get("records", []) if isinstance(chunks, dict) else chunks
+                                for chunk in (records if isinstance(records, list) else []):
+                                    chunk_id = chunk.get("id") if isinstance(chunk, dict) else None
+                                    if chunk_id:
+                                        results.append({
+                                            "chunkId": chunk_id,
+                                            "content": chunk.get("content", ""),
+                                            "docId": doc_id,
+                                            "kbId": kb_id,
+                                            "score": 0.8,  # 向量检索默认分数
+                                        })
+
+                    if results:
+                        level = "vector"
+                        logger.info(f"Vector search returned {len(results)} results")
+            except Exception as e:
+                logger.warning(f"Vector search failed: {e}")
 
         # 记录引用
         for item in results:
@@ -349,6 +473,7 @@ class MemoryManager:
                 "content": item.get("content", ""),
                 "docId": item.get("docId"),
                 "kbId": item.get("kbId"),
+                "score": item.get("score", 0),  # 相似度分数
                 "metadata": item.get("metadata", {}),
                 "confidence": conf.get("confidence", 1),
                 "normalizedScore": conf.get("normalizedScore", 0),
@@ -363,8 +488,12 @@ class MemoryManager:
             "results": enriched_results,
             "count": len(enriched_results),
             "level": level,
-            "feature_codes": feature_codes,
-            "module": module,
+            "feature_codes": effective_feature_codes,
+            "module": effective_module,
+            "auto_detected": {
+                "feature_codes": auto_detected_features if not feature_codes else [],
+                "module": auto_detected_module if not module else None,
+            },
         }
 
     def list_projects(self) -> List[Dict[str, Any]]:
@@ -509,6 +638,102 @@ def delete_memory_impl(project: str, filename: Optional[str] = None) -> Dict[str
         return {"status": "error", "error": str(e)}
 
 
+def batch_upload_memories_impl(project: str, files: List[Dict[str, str]],
+                                feature_codes: Optional[List[str]] = None,
+                                module: Optional[str] = None) -> Dict[str, Any]:
+    """批量上传记忆文件
+
+    Args:
+        project: 项目名称
+        files: 文件列表，每项包含 {"filename": "...", "content": "..."}
+        feature_codes: 功能编号列表（可选）
+        module: 模块名称（可选）
+
+    Returns:
+        批量上传结果
+    """
+    manager = get_manager()
+    results = []
+    success_count = 0
+    fail_count = 0
+
+    for file_info in files:
+        filename = file_info.get("filename", "")
+        content = file_info.get("content", "")
+        if not filename or not content:
+            results.append({"filename": filename, "status": "error", "error": "Missing filename or content"})
+            fail_count += 1
+            continue
+
+        try:
+            result = manager.upload_memory(project, filename, content,
+                                           feature_codes=feature_codes, module=module)
+            results.append(result)
+            if result.get("status") == "success":
+                success_count += 1
+            else:
+                fail_count += 1
+        except Exception as e:
+            results.append({"filename": filename, "status": "error", "error": str(e)})
+            fail_count += 1
+
+    return {
+        "status": "completed",
+        "project": project,
+        "total": len(files),
+        "success": success_count,
+        "failed": fail_count,
+        "results": results,
+    }
+
+
+def batch_delete_memories_impl(project: str, filenames: List[str]) -> Dict[str, Any]:
+    """批量删除记忆文件
+
+    Args:
+        project: 项目名称
+        filenames: 文件名列表
+
+    Returns:
+        批量删除结果
+    """
+    manager = get_manager()
+    manager.ensure_logged_in()
+
+    try:
+        kb_id = manager.get_or_create_project_kb(project)
+
+        # 查询所有文档
+        docs_resp = manager._request("GET", f"/knowledge-base/{kb_id}/docs")
+        docs = docs_resp.get("data", {})
+        records = docs.get("records", []) if isinstance(docs, dict) else []
+
+        # 按文件名匹配
+        deleted_count = 0
+        not_found = []
+        for filename in filenames:
+            found = False
+            for doc in records:
+                if doc.get("docName") == filename:
+                    doc_id = doc.get("id")
+                    if doc_id:
+                        manager._request("DELETE", f"/knowledge-base/docs/{doc_id}")
+                        deleted_count += 1
+                        found = True
+                        break
+            if not found:
+                not_found.append(filename)
+
+        return {
+            "status": "success",
+            "project": project,
+            "deleted": deleted_count,
+            "not_found": not_found,
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
 # MCP Tool 元数据
 
 UPLOAD_MEMORY_TOOL = {
@@ -604,6 +829,62 @@ DELETE_MEMORY_TOOL = {
     },
 }
 
+BATCH_UPLOAD_MEMORIES_TOOL = {
+    "name": "batch_upload_memories",
+    "description": "批量上传记忆文件到项目知识库",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "project": {
+                "type": "string",
+                "description": "项目名称",
+            },
+            "files": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string"},
+                        "content": {"type": "string"},
+                    },
+                    "required": ["filename", "content"],
+                },
+                "description": "文件列表",
+            },
+            "feature_codes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "功能编号列表（可选）",
+            },
+            "module": {
+                "type": "string",
+                "description": "模块名称（可选）",
+            },
+        },
+        "required": ["project", "files"],
+    },
+}
+
+BATCH_DELETE_MEMORIES_TOOL = {
+    "name": "batch_delete_memories",
+    "description": "批量删除记忆文件",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "project": {
+                "type": "string",
+                "description": "项目名称",
+            },
+            "filenames": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "文件名列表",
+            },
+        },
+        "required": ["project", "filenames"],
+    },
+}
+
 
 def register_memory_tools(gateway_mcp):
     """向 FastMCP 注册记忆管理工具"""
@@ -641,6 +922,22 @@ def register_memory_tools(gateway_mcp):
             content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
         )
 
+    async def batch_upload_memories(ctx, project: str, files: List[Dict[str, str]],
+                                     feature_codes: List[str] = None, module: str = None):
+        """批量上传记忆文件"""
+        result = batch_upload_memories_impl(project, files,
+                                            feature_codes=feature_codes, module=module)
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+        )
+
+    async def batch_delete_memories(ctx, project: str, filenames: List[str]):
+        """批量删除记忆文件"""
+        result = batch_delete_memories_impl(project, filenames)
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+        )
+
     # 设置元数据
     upload_memory.__name__ = "upload_memory"
     upload_memory.__doc__ = UPLOAD_MEMORY_TOOL["description"]
@@ -651,10 +948,21 @@ def register_memory_tools(gateway_mcp):
     list_projects.__name__ = "list_projects"
     list_projects.__doc__ = LIST_PROJECTS_TOOL["description"]
 
+    delete_memory.__name__ = "delete_memory"
+    delete_memory.__doc__ = DELETE_MEMORY_TOOL["description"]
+
+    batch_upload_memories.__name__ = "batch_upload_memories"
+    batch_upload_memories.__doc__ = BATCH_UPLOAD_MEMORIES_TOOL["description"]
+
+    batch_delete_memories.__name__ = "batch_delete_memories"
+    batch_delete_memories.__doc__ = BATCH_DELETE_MEMORIES_TOOL["description"]
+
     # 注册工具
     gateway_mcp.tool(name="upload_memory", description=UPLOAD_MEMORY_TOOL["description"])(upload_memory)
     gateway_mcp.tool(name="ask_project", description=ASK_PROJECT_TOOL["description"])(ask_project)
     gateway_mcp.tool(name="list_projects", description=LIST_PROJECTS_TOOL["description"])(list_projects)
     gateway_mcp.tool(name="delete_memory", description=DELETE_MEMORY_TOOL["description"])(delete_memory)
+    gateway_mcp.tool(name="batch_upload_memories", description=BATCH_UPLOAD_MEMORIES_TOOL["description"])(batch_upload_memories)
+    gateway_mcp.tool(name="batch_delete_memories", description=BATCH_DELETE_MEMORIES_TOOL["description"])(batch_delete_memories)
 
-    logger.info("Registered memory tools: upload_memory, ask_project, list_projects, delete_memory")
+    logger.info("Registered memory tools: upload_memory, ask_project, list_projects, delete_memory, batch_upload_memories, batch_delete_memories")
