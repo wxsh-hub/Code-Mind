@@ -73,7 +73,8 @@ public class KnowledgeChunkApiController {
         if (request.getFeatureCodes() != null && !request.getFeatureCodes().isEmpty()) {
             String[] codes = request.getFeatureCodes().split(",");
             for (String code : codes) {
-                wrapper.apply("metadata->'feature_codes' @> '[\"{0}\"]'", code.trim());
+                // 使用原生SQL避免参数替换问题
+                wrapper.apply("metadata->'feature_codes' @> ('[\"' || {0} || '\"]')::jsonb", code.trim());
             }
         }
 
@@ -92,6 +93,10 @@ public class KnowledgeChunkApiController {
             item.put("content", chunk.getContent());
             item.put("docId", chunk.getDocId());
             item.put("kbId", chunk.getKbId());
+
+            // 计算相似度分数（基于关键词匹配度）
+            double score = calculateSimilarityScore(request.getQuery(), chunk.getContent());
+            item.put("score", Math.round(score * 10000.0) / 10000.0); // 保留4位小数
 
             // 基础元数据
             Map<String, Object> metadata = new HashMap<>();
@@ -258,6 +263,51 @@ public class KnowledgeChunkApiController {
         }).toList();
 
         return Results.success(result);
+    }
+
+    /**
+     * 计算查询与内容的相似度分数
+     * <p>
+     * 使用简单的关键词匹配算法：查询词在内容中出现的比例
+     */
+    private double calculateSimilarityScore(String query, String content) {
+        if (query == null || query.isEmpty() || content == null || content.isEmpty()) {
+            return 0.0;
+        }
+
+        // 分词（简单实现：按空格和标点分词）
+        String[] queryWords = query.toLowerCase().split("[\\s\\p{Punct}]+");
+        String contentLower = content.toLowerCase();
+
+        int matchCount = 0;
+        int totalWords = 0;
+
+        for (String word : queryWords) {
+            if (word.length() > 1) { // 忽略单字符
+                totalWords++;
+                if (contentLower.contains(word)) {
+                    matchCount++;
+                }
+            }
+        }
+
+        if (totalWords == 0) {
+            return 0.0;
+        }
+
+        // 基础分数：匹配词比例
+        double baseScore = (double) matchCount / totalWords;
+
+        // 长度惩罚：内容太短或太长都降低分数
+        double lengthFactor = 1.0;
+        int contentLen = content.length();
+        if (contentLen < 50) {
+            lengthFactor = 0.8; // 内容太短
+        } else if (contentLen > 5000) {
+            lengthFactor = 0.9; // 内容太长
+        }
+
+        return baseScore * lengthFactor;
     }
 
     // --- 请求 DTO ---
