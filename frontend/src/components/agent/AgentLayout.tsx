@@ -1,8 +1,10 @@
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 
 import { AgentRawLog } from "@/components/agent/AgentRawLog";
 import { AgentSidebar } from "@/components/agent/AgentSidebar";
 import { getAgentMeta } from "@/services/agentService";
+import { useAuthStore } from "@/stores/authStore";
 import type { AgentEngineMeta } from "@/types/agent";
 
 export type AgentMetaState =
@@ -40,6 +42,10 @@ interface AgentHeaderProps {
 }
 
 function AgentHeader({ meta, rawOpen, onToggleRaw }: AgentHeaderProps) {
+  const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === "admin";
+
   const badgeName =
     meta.status === "online" ? meta.meta.framework : meta.status === "probing" ? "探测中" : "离线";
 
@@ -67,6 +73,15 @@ function AgentHeader({ meta, rawOpen, onToggleRaw }: AgentHeaderProps) {
       </div>
 
       <div className="agent-header-right">
+        {isAdmin && (
+          <button
+            type="button"
+            className="agent-head-btn"
+            onClick={() => navigate("/admin/dashboard")}
+          >
+            <span className="agent-btn-glyph">⚙</span> 管理后台
+          </button>
+        )}
         <button
           type="button"
           className="agent-head-btn"
