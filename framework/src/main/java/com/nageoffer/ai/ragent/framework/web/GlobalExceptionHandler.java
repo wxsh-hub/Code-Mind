@@ -109,8 +109,23 @@ public class GlobalExceptionHandler {
      * 拦截未登录异常
      */
     @ExceptionHandler(value = NotLoginException.class)
-    public Result<Void> notLoginException(HttpServletRequest request, NotLoginException ex) {
+    public Object notLoginException(HttpServletRequest request, NotLoginException ex,
+                                     jakarta.servlet.http.HttpServletResponse response) {
         log.warn("[{}] {} [auth] not-login: {}", request.getMethod(), getUrl(request), ex.getMessage());
+
+        // 如果是 SSE 请求，返回 SSE 格式的错误
+        String accept = request.getHeader("Accept");
+        if (accept != null && accept.contains("text/event-stream")) {
+            response.setContentType("text/event-stream;charset=UTF-8");
+            response.setStatus(401);
+            try {
+                response.getWriter().write("event: error\ndata: {\"error\": \"未登录或登录已过期\"}\n\n");
+                response.getWriter().flush();
+            } catch (Exception ignored) {
+            }
+            return null;
+        }
+
         return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), "未登录或登录已过期");
     }
 
@@ -143,11 +158,27 @@ public class GlobalExceptionHandler {
      * 拦截未捕获异常
      */
     @ExceptionHandler(value = Throwable.class)
-    public Result<Void> defaultErrorHandler(HttpServletRequest request, Throwable throwable) {
+    public Object defaultErrorHandler(HttpServletRequest request, Throwable throwable,
+                                       jakarta.servlet.http.HttpServletResponse response) {
         log.error("[{}] {} ", request.getMethod(), getUrl(request), throwable);
 
         // 提取更有用的错误信息
         String message = extractFriendlyMessage(throwable);
+
+        // 如果是 SSE 请求，返回 SSE 格式的错误
+        String accept = request.getHeader("Accept");
+        if (accept != null && accept.contains("text/event-stream")) {
+            response.setContentType("text/event-stream;charset=UTF-8");
+            response.setStatus(500);
+            try {
+                String errorJson = "{\"error\": \"" + message.replace("\"", "\\\"") + "\"}";
+                response.getWriter().write("event: error\ndata: " + errorJson + "\n\n");
+                response.getWriter().flush();
+            } catch (Exception ignored) {
+            }
+            return null;
+        }
+
         return Results.failure(BaseErrorCode.SERVICE_ERROR.code(), message);
     }
 

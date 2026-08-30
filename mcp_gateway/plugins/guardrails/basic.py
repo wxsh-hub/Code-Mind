@@ -40,7 +40,7 @@ TOKENS_REGEXES = {
         "replacement": "<AWS_ACCESS_KEY>",
     },
     "jwt": {
-        "regex": r'\b(ey[a-zA-Z0-9]{17,}\.ey[a-zA-Z0-9\/\\_-]{17,}\.(?:[a-zA-Z0-9\/\\_-]{10,}={0,2})?)(?:[`\'"\s;]|\\[nr]|$)',
+        "regex": r'\b(ey[a-zA-Z0-9_-]{8,}\.ey[a-zA-Z0-9\/\\_-]{8,}\.(?:[a-zA-Z0-9\/\\_-]{4,}={0,2})?)(?:[`\'"\s;]|\\[nr]|$)',
         "replacement": "<JWT_TOKEN>",
     },
     "gitlab_session_cookie": {

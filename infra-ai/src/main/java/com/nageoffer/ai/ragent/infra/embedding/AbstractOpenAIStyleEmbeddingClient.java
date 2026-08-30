@@ -107,6 +107,37 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
         return results;
     }
 
+    // ==================== 错误处理 ====================
+
+    /**
+     * 构建友好的错误信息
+     */
+    private String buildFriendlyErrorMessage(int statusCode, String responseBody, String provider) {
+        String baseMessage = provider + " embedding 请求失败";
+
+        switch (statusCode) {
+            case 401:
+                return baseMessage + ": API Key 无效或已过期，请检查配置中的 api-key 是否正确";
+            case 403:
+                return baseMessage + ": API Key 权限不足，请检查账户权限";
+            case 429:
+                return baseMessage + ": 请求频率超限，请稍后重试";
+            case 500:
+            case 502:
+            case 503:
+                return baseMessage + ": 服务端错误 (" + statusCode + ")，请稍后重试";
+            default:
+                // 尝试从响应中提取错误信息
+                try {
+                    if (responseBody != null && responseBody.contains("invalid_api_key")) {
+                        return baseMessage + ": API Key 无效，请检查配置";
+                    }
+                } catch (Exception ignored) {
+                }
+                return baseMessage + ": HTTP " + statusCode;
+        }
+    }
+
     // ==================== 模板方法：核心请求逻辑 ====================
 
     /**
@@ -150,8 +181,12 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
                 String errBody = HttpResponseHelper.readBody(response.body());
                 log.warn("{} embedding 请求失败 - 模型：{}，条数：{}，耗时：{}ms，status={}, body={}",
                         provider(), model, texts.size(), System.currentTimeMillis() - startTime, response.code(), errBody);
+
+                // 提供更友好的错误信息
+                String errorMessage = buildFriendlyErrorMessage(response.code(), errBody, provider());
+
                 throw new ModelClientException(
-                        provider() + " embedding 请求失败: HTTP " + response.code(),
+                        errorMessage,
                         ModelClientErrorType.fromHttpStatus(response.code()),
                         response.code()
                 );

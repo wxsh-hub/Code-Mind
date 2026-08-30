@@ -37,6 +37,9 @@ build/
 .vscode/
 scripts/logs/
 
+### Logs ###
+*.log
+
 ### Frontend ###
 node_modules/
 dist/
