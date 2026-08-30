@@ -145,7 +145,52 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(value = Throwable.class)
     public Result<Void> defaultErrorHandler(HttpServletRequest request, Throwable throwable) {
         log.error("[{}] {} ", request.getMethod(), getUrl(request), throwable);
-        return Results.failure();
+
+        // 提取更有用的错误信息
+        String message = extractFriendlyMessage(throwable);
+        return Results.failure(BaseErrorCode.SERVICE_ERROR.code(), message);
+    }
+
+    /**
+     * 提取友好的错误信息
+     */
+    private String extractFriendlyMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "系统执行出错";
+        }
+
+        // 获取根本原因
+        Throwable cause = throwable;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+
+        String className = cause.getClass().getSimpleName();
+        String message = cause.getMessage();
+
+        // 根据异常类型返回友好信息
+        if (className.contains("NullPointer")) {
+            return "数据处理异常，请检查输入参数";
+        } else if (className.contains("IndexOutOfBounds")) {
+            return "数据索引越界，请检查请求参数";
+        } else if (className.contains("IO") || className.contains("Connection")) {
+            return "网络连接异常，请稍后重试";
+        } else if (className.contains("Timeout")) {
+            return "请求超时，请稍后重试";
+        } else if (className.contains("SQL") || className.contains("DataAccess")) {
+            return "数据访问异常，请联系管理员";
+        } else if (className.contains("Permission") || className.contains("Access")) {
+            return "权限不足，请联系管理员";
+        } else if (className.contains("Validation") || className.contains("IllegalArgument")) {
+            return "参数验证失败: " + (message != null ? message : "请检查输入");
+        }
+
+        // 如果有具体消息，返回它
+        if (message != null && !message.isEmpty() && message.length() < 200) {
+            return message;
+        }
+
+        return "系统执行出错: " + className;
     }
 
     private String getUrl(HttpServletRequest request) {
