@@ -24,6 +24,9 @@ import { QueryTermMappingPage } from "@/pages/admin/query-term-mapping/QueryTerm
 import { AgentProfilePage } from "@/pages/admin/agents/AgentProfilePage";
 import { AgentPromptPage } from "@/pages/admin/agents/AgentPromptPage";
 import { UserListPage } from "@/pages/admin/users/UserListPage";
+import { ConflictReviewPage } from "@/pages/admin/conflict-review/ConflictReviewPage";
+import { ModuleManagementPage } from "@/pages/admin/modules/ModuleManagementPage";
+import { FeatureMetadataPage } from "@/pages/admin/feature-metadata/FeatureMetadataPage";
 import { useAuthStore } from "@/stores/authStore";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -190,6 +193,18 @@ export const router = createBrowserRouter([
       {
         path: "users",
         element: <UserListPage />
+      },
+      {
+        path: "conflict-review",
+        element: <ConflictReviewPage />
+      },
+      {
+        path: "modules",
+        element: <ModuleManagementPage />
+      },
+      {
+        path: "feature-metadata",
+        element: <FeatureMetadataPage />
       }
     ]
   },

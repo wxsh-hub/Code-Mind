@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
+  AlertTriangle,
   Bot,
   ChevronDown,
   ChevronRight,
@@ -20,6 +21,7 @@ import {
   Share2,
   ShieldCheck,
   Settings,
+  Tag,
   Upload,
   Users,
   FolderKanban,
@@ -149,6 +151,21 @@ const menuGroups: MenuGroup[] = [
         label: "审计日志",
         icon: ShieldCheck
       },
+      {
+        path: "/admin/modules",
+        label: "模块管理",
+        icon: Layers
+      },
+      {
+        path: "/admin/feature-metadata",
+        label: "功能元数据标记",
+        icon: Tag
+      },
+      {
+        path: "/admin/conflict-review",
+        label: "矛盾审核",
+        icon: AlertTriangle
+      },
     ]
   },
   {
@@ -186,7 +203,10 @@ const breadcrumbMap: Record<string, string> = {
   "sample-questions": "示例问题",
   mappings: "关键词映射",
   settings: "系统设置",
-  users: "用户管理"
+  users: "用户管理",
+  modules: "模块管理",
+  "feature-metadata": "功能元数据标记",
+  "conflict-review": "矛盾审核"
 };
 
 export function AdminLayout() {
