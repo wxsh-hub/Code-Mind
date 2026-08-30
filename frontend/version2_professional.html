@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code-Mind - 版本二：专业风格</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; height: 100vh; }
+
+        /* 侧边栏 */
+        .sidebar { width: 200px; background: #001529; color: #fff; padding: 16px 0; }
+        .sidebar-logo { padding: 0 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 8px; }
+        .sidebar-logo h2 { font-size: 18px; color: #1890ff; }
+        .sidebar-menu { list-style: none; }
+        .sidebar-menu li { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.65); }
+        .sidebar-menu li:hover, .sidebar-menu li.active { background: #1890ff; color: #fff; }
+        .sidebar-menu li .icon { width: 20px; text-align: center; }
+
+        /* 主内容区 */
+        .main { flex: 1; display: flex; flex-direction: column; }
+
+        /* 顶部栏 */
+        .topbar { height: 56px; background: #fff; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e8e8e8; }
+        .topbar-left { display: flex; align-items: center; gap: 16px; }
+        .breadcrumb { color: #666; font-size: 14px; }
+        .topbar-right { display: flex; align-items: center; gap: 16px; }
+        .notification { position: relative; cursor: pointer; }
+        .notification .badge { position: absolute; top: -4px; right: -4px; background: #ff4d4f; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 10px; }
+
+        /* 内容区 */
+        .content { flex: 1; padding: 24px; overflow-y: auto; }
+
+        /* 统计卡片 */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+        .stat-card .label { font-size: 14px; color: #999; margin-bottom: 8px; }
+        .stat-card .value { font-size: 28px; font-weight: 600; color: #333; }
+        .stat-card .icon { font-size: 32px; float: right; margin-top: -40px; opacity: 0.3; }
+
+        /* 表格 */
+        .table-container { background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+        .table-header { padding: 16px 20px; border-bottom: 1px solid #e8e8e8; display: flex; justify-content: space-between; align-items: center; }
+        .table-header h3 { font-size: 16px; }
+        .table-actions { display: flex; gap: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #e8e8e8; }
+        th { background: #fafafa; font-weight: 500; color: #666; }
+        .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .status.active { background: #f6ffed; color: #52c41a; }
+        .status.warning { background: #fffbe6; color: #faad14; }
+        .action-link { color: #1890ff; cursor: pointer; margin-right: 12px; }
+
+        /* 按钮 */
+        .btn { padding: 6px 16px; border-radius: 4px; border: none; cursor: pointer; font-size: 14px; }
+        .btn-primary { background: #1890ff; color: #fff; }
+        .btn-sm { padding: 4px 12px; font-size: 12px; }
+
+        /* 问答页面 */
+        .chat-layout { display: grid; grid-template-columns: 240px 1fr; gap: 16px; height: calc(100vh - 120px); }
+        .chat-history { background: #fff; border-radius: 8px; padding: 16px; overflow-y: auto; }
+        .chat-history h4 { margin-bottom: 12px; color: #333; }
+        .history-item { padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 8px; font-size: 13px; color: #666; }
+        .history-item:hover, .history-item.active { background: #e6f7ff; color: #1890ff; }
+        .chat-main { background: #fff; border-radius: 8px; display: flex; flex-direction: column; }
+        .chat-messages { flex: 1; padding: 24px; overflow-y: auto; }
+        .msg { margin-bottom: 20px; }
+        .msg .meta { font-size: 12px; color: #999; margin-bottom: 8px; }
+        .msg .bubble { padding: 12px 16px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+        .msg.user .bubble { background: #1890ff; color: #fff; margin-left: 60px; }
+        .msg.ai .bubble { background: #f5f5f5; color: #333; margin-right: 60px; }
+        .msg .refs { margin-top: 10px; padding: 10px; background: #fffbe6; border-radius: 6px; font-size: 12px; color: #666; }
+        .chat-input-area { padding: 16px; border-top: 1px solid #e8e8e8; display: flex; gap: 12px; }
+        .chat-input-area input { flex: 1; padding: 10px; border: 1px solid #d9d9d9; border-radius: 6px; }
+
+        /* 审核页面 */
+        .filter-bar { background: #fff; padding: 16px 20px; border-radius: 8px; margin-bottom: 16px; display: flex; gap: 16px; align-items: center; }
+        .filter-bar select { padding: 6px 12px; border: 1px solid #d9d9d9; border-radius: 4px; }
+        .conflict-card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+        .conflict-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+        .conflict-side { padding: 16px; background: #fafafa; border-radius: 8px; border-left: 4px solid #1890ff; }
+        .conflict-side .tag { display: inline-block; padding: 2px 8px; background: #1890ff; color: #fff; border-radius: 4px; font-size: 12px; margin-bottom: 8px; }
+        .conflict-side .text { font-size: 14px; line-height: 1.6; }
+        .conflict-side .source { font-size: 12px; color: #999; margin-top: 8px; }
+        .conflict-side .confidence { font-size: 12px; color: #52c41a; margin-top: 4px; }
+        .ai-analysis { padding: 12px; background: #f6ffed; border-radius: 6px; margin: 12px 0; font-size: 13px; color: #333; }
+        .ai-analysis::before { content: "🤖 AI 分析: "; font-weight: 500; }
+        .conflict-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+        .btn-approve { background: #52c41a; color: #fff; }
+        .btn-reject { background: #ff4d4f; color: #fff; }
+        .btn-both { background: #faad14; color: #fff; }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <div class="sidebar-logo">
+            <h2>📚 Code-Mind</h2>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.45);">企业知识管理平台</div>
+        </div>
+        <ul class="sidebar-menu">
+            <li class="active" onclick="showPage('dashboard')">
+                <span class="icon">📊</span> 概览
+            </li>
+            <li onclick="showPage('kb')">
+                <span class="icon">📚</span> 知识库
+            </li>
+            <li onclick="showPage('module')">
+                <span class="icon">📦</span> 模块管理
+            </li>
+            <li onclick="showPage('review')">
+                <span class="icon">⚠️</span> 矛盾审核
+                <span style="margin-left: auto; background: #ff4d4f; padding: 2px 6px; border-radius: 10px; font-size: 11px;">12</span>
+            </li>
+            <li onclick="showPage('qa')">
+                <span class="icon">💬</span> 智能问答
+            </li>
+            <li onclick="showPage('settings')">
+                <span class="icon">⚙️</span> 系统设置
+            </li>
+        </ul>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main">
+        <!-- 顶部栏 -->
+        <div class="topbar">
+            <div class="topbar-left">
+                <span class="breadcrumb" id="breadcrumb">概览</span>
+            </div>
+            <div class="topbar-right">
+                <div class="notification">
+                    🔔
+                    <span class="badge">3</span>
+                </div>
+                <span>👤 管理员</span>
+            </div>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="content">
+            <!-- 概览页面 -->
+            <div id="page-dashboard" class="page">
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="label">知识库</div>
+                        <div class="value">12</div>
+                        <div class="icon">📚</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">文档总数</div>
+                        <div class="value">156</div>
+                        <div class="icon">📄</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">待审核</div>
+                        <div class="value">12</div>
+                        <div class="icon">⚠️</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">今日问答</div>
+                        <div class="value">42</div>
+                        <div class="icon">💬</div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>最近活动</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>操作</th>
+                                <th>详情</th>
+                                <th>用户</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>10:30</td>
+                                <td><span class="status active">上传文档</span></td>
+                                <td>MEMORY.md → Code-Mind</td>
+                                <td>管理员</td>
+                            </tr>
+                            <tr>
+                                <td>10:15</td>
+                                <td><span class="status active">审核通过</span></td>
+                                <td>矛盾对 #123</td>
+                                <td>审核员</td>
+                            </tr>
+                            <tr>
+                                <td>09:45</td>
+                                <td><span class="status warning">AI 删除</span></td>
+                                <td>过时知识 3 条</td>
+                                <td>系统</td>
+                            </tr>
+                            <tr>
+                                <td>09:30</td>
+                                <td><span class="status active">新建知识库</span></td>
+                                <td>MyProject</td>
+                                <td>管理员</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 知识库页面 -->
+            <div id="page-kb" class="page" style="display:none;">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>知识库列表</h3>
+                        <div class="table-actions">
+                            <button class="btn btn-primary">+ 新建知识库</button>
+                            <button class="btn">刷新</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>知识库名称</th>
+                                <th>文档数</th>
+                                <th>分块数</th>
+                                <th>有效</th>
+                                <th>废弃</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>📚 Code-Mind</strong></td>
+                                <td>12</td>
+                                <td>48</td>
+                                <td><span class="status active">45</span></td>
+                                <td><span class="status warning">3</span></td>
+                                <td>
+                                    <span class="action-link">管理文档</span>
+                                    <span class="action-link">查看分块</span>
+                                    <span class="action-link" style="color: #ff4d4f;">删除</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>📚 MyProject</strong></td>
+                                <td>5</td>
+                                <td>20</td>
+                                <td><span class="status active">18</span></td>
+                                <td><span class="status warning">2</span></td>
+                                <td>
+                                    <span class="action-link">管理文档</span>
+                                    <span class="action-link">查看分块</span>
+                                    <span class="action-link" style="color: #ff4d4f;">删除</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>📚 TestProject</strong></td>
+                                <td>3</td>
+                                <td>12</td>
+                                <td><span class="status active">12</span></td>
+                                <td><span class="status warning">0</span></td>
+                                <td>
+                                    <span class="action-link">管理文档</span>
+                                    <span class="action-link">查看分块</span>
+                                    <span class="action-link" style="color: #ff4d4f;">删除</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 问答页面 -->
+            <div id="page-qa" class="page" style="display:none;">
+                <div class="chat-layout">
+                    <div class="chat-history">
+                        <h4>历史记录</h4>
+                        <div class="history-item active">项目使用什么数据库？</div>
+                        <div class="history-item">推荐使用什么认证方式？</div>
+                        <div class="history-item">如何添加用户？</div>
+                        <div class="history-item">订单创建流程是什么？</div>
+                    </div>
+                    <div class="chat-main">
+                        <div class="chat-messages">
+                            <div class="msg user">
+                                <div class="meta">👤 用户 · 10:30</div>
+                                <div class="bubble">项目使用什么数据库？</div>
+                            </div>
+                            <div class="msg ai">
+                                <div class="meta">🤖 AI · 10:30</div>
+                                <div class="bubble">
+                                    项目使用 <strong>PostgreSQL 16</strong> 作为主数据库，并结合 <strong>pgvector</strong> 插件用于向量存储。
+                                </div>
+                                <div class="refs">
+                                    📎 引用来源：<br>
+                                    [1] MEMORY.md - 技术栈说明 (L15-20)<br>
+                                    [2] integration-design.md - 集成设计 (L8-12)
+                                </div>
+                            </div>
+                            <div class="msg user">
+                                <div class="meta">👤 用户 · 10:32</div>
+                                <div class="bubble">推荐使用什么认证方式？</div>
+                            </div>
+                            <div class="msg ai">
+                                <div class="meta">🤖 AI · 10:32</div>
+                                <div class="bubble">
+                                    推荐使用 <strong>Sa-Token</strong> 进行认证。<br><br>
+                                    优点：<br>
+                                    1. 简单易用<br>
+                                    2. 功能丰富<br>
+                                    3. Spring Boot 集成好
+                                </div>
+                                <div class="refs">
+                                    📎 引用来源：<br>
+                                    [1] real_api.md - API 设计规范 (L5-8)
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" placeholder="输入问题...">
+                            <button class="btn btn-primary">发送</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 审核页面 -->
+            <div id="page-review" class="page" style="display:none;">
+                <div class="filter-bar">
+                    <span>状态:</span>
+                    <select>
+                        <option>待审核</option>
+                        <option>已审核</option>
+                        <option>已跳过</option>
+                    </select>
+                    <span>模块:</span>
+                    <select>
+                        <option>全部</option>
+                        <option>用户管理</option>
+                        <option>订单管理</option>
+                    </select>
+                    <span style="margin-left: auto; color: #999;">共 12 条待审核</span>
+                </div>
+
+                <div class="conflict-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong>矛盾对 #1</strong>
+                        <span style="color: #999; font-size: 12px;">2026-08-30 10:30</span>
+                    </div>
+                    <div class="conflict-grid">
+                        <div class="conflict-side">
+                            <span class="tag">A</span>
+                            <div class="text">"推荐使用 MySQL"</div>
+                            <div class="source">来源: author_a.md</div>
+                            <div class="confidence">置信度: 3</div>
+                        </div>
+                        <div class="conflict-side" style="border-left-color: #52c41a;">
+                            <span class="tag" style="background: #52c41a;">B</span>
+                            <div class="text">"推荐使用 PostgreSQL"</div>
+                            <div class="source">来源: author_b.md</div>
+                            <div class="confidence">置信度: 5</div>
+                        </div>
+                    </div>
+                    <div class="ai-analysis">
+                        B 更可靠，A 是过时信息。PostgreSQL 是当前使用的数据库。
+                    </div>
+                    <div class="conflict-btns">
+                        <button class="btn btn-sm btn-approve">保留 A</button>
+                        <button class="btn btn-sm btn-reject">保留 B ✓</button>
+                        <button class="btn btn-sm btn-both">都保留</button>
+                        <button class="btn btn-sm">跳过</button>
+                    </div>
+                </div>
+
+                <div class="conflict-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong>矛盾对 #2</strong>
+                        <span style="color: #999; font-size: 12px;">2026-08-30 10:25</span>
+                    </div>
+                    <div class="conflict-grid">
+                        <div class="conflict-side">
+                            <span class="tag">A</span>
+                            <div class="text">"使用 JWT Token 认证"</div>
+                            <div class="source">来源: api_a.md</div>
+                            <div class="confidence">置信度: 4</div>
+                        </div>
+                        <div class="conflict-side" style="border-left-color: #faad14;">
+                            <span class="tag" style="background: #faad14;">B</span>
+                            <div class="text">"使用 Sa-Token 认证"</div>
+                            <div class="source">来源: api_b.md</div>
+                            <div class="confidence">置信度: 4</div>
+                        </div>
+                    </div>
+                    <div class="ai-analysis">
+                        两个观点都有道理，无法判断哪个是最新版本。
+                    </div>
+                    <div class="conflict-btns">
+                        <button class="btn btn-sm btn-approve">保留 A</button>
+                        <button class="btn btn-sm btn-approve">保留 B</button>
+                        <button class="btn btn-sm btn-reject">都保留 ✓</button>
+                        <button class="btn btn-sm">跳过</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            document.getElementById('page-' + page).style.display = 'block';
+            document.querySelectorAll('.sidebar-menu li').forEach(li => li.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            const titles = {
+                dashboard: '概览',
+                kb: '知识库管理',
+                module: '模块管理',
+                review: '矛盾审核',
+                qa: '智能问答',
+                settings: '系统设置'
+            };
+            document.getElementById('breadcrumb').textContent = titles[page] || page;
+        }
+    </script>
+</body>
+</html>

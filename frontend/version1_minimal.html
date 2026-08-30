@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code-Mind - 版本一：极简风格</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
+
+        /* 顶部导航 */
+        .header { background: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e8e8e8; }
+        .logo { font-size: 20px; font-weight: 600; color: #1890ff; }
+        .nav { display: flex; gap: 24px; }
+        .nav a { text-decoration: none; color: #666; padding: 8px 0; border-bottom: 2px solid transparent; }
+        .nav a.active { color: #1890ff; border-bottom-color: #1890ff; }
+        .user { display: flex; align-items: center; gap: 12px; }
+
+        /* 主内容 */
+        .main { max-width: 1200px; margin: 24px auto; padding: 0 24px; }
+
+        /* 页面标题 */
+        .page-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .page-title h1 { font-size: 24px; color: #333; }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; }
+        .btn-primary { background: #1890ff; color: #fff; }
+        .btn-primary:hover { background: #40a9ff; }
+
+        /* 知识库卡片 */
+        .kb-card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+        .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .kb-name { display: flex; align-items: center; gap: 8px; }
+        .kb-icon { font-size: 24px; }
+        .kb-title { font-size: 16px; font-weight: 500; }
+        .kb-stats { display: flex; gap: 24px; color: #666; font-size: 14px; }
+        .kb-actions { display: flex; gap: 8px; }
+        .btn-text { background: none; border: none; color: #1890ff; cursor: pointer; }
+
+        /* 问答页面 */
+        .chat-container { background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+        .chat-messages { padding: 24px; min-height: 400px; }
+        .message { margin-bottom: 20px; display: flex; gap: 12px; }
+        .message.user { justify-content: flex-end; }
+        .message .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .message.user .avatar { background: #1890ff; color: #fff; }
+        .message.ai .avatar { background: #f0f0f0; }
+        .message .content { max-width: 70%; }
+        .message .bubble { padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+        .message.user .bubble { background: #1890ff; color: #fff; border-bottom-right-radius: 4px; }
+        .message.ai .bubble { background: #f5f5f5; color: #333; border-bottom-left-radius: 4px; }
+        .references { margin-top: 12px; padding: 12px; background: #fffbe6; border-radius: 6px; font-size: 12px; color: #666; }
+        .feedback { display: flex; gap: 8px; margin-top: 8px; }
+        .feedback button { padding: 4px 8px; border: 1px solid #d9d9d9; border-radius: 4px; background: #fff; cursor: pointer; }
+
+        /* 输入框 */
+        .chat-input { padding: 16px 24px; border-top: 1px solid #e8e8e8; display: flex; gap: 12px; }
+        .chat-input input { flex: 1; padding: 10px 16px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; }
+
+        /* 审核页面 */
+        .conflict-card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+        .conflict-header { font-size: 14px; color: #999; margin-bottom: 12px; }
+        .conflict-content { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .conflict-item { padding: 12px; background: #fafafa; border-radius: 6px; }
+        .conflict-item .label { font-size: 12px; color: #999; margin-bottom: 8px; }
+        .conflict-item .text { font-size: 14px; color: #333; }
+        .conflict-item .source { font-size: 12px; color: #1890ff; margin-top: 8px; }
+        .conflict-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .btn-outline { background: #fff; border: 1px solid #d9d9d9; color: #666; }
+        .btn-success { background: #52c41a; color: #fff; }
+        .btn-warning { background: #faad14; color: #fff; }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="logo">📚 Code-Mind</div>
+        <div class="nav">
+            <a href="#" class="active" onclick="showPage('kb')">知识库</a>
+            <a href="#" onclick="showPage('qa')">问答</a>
+            <a href="#" onclick="showPage('review')">审核</a>
+        </div>
+        <div class="user">
+            <span>⚙️</span>
+            <span>👤 管理员</span>
+        </div>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="main">
+        <!-- 知识库页面 -->
+        <div id="page-kb" class="page">
+            <div class="page-title">
+                <h1>知识库管理</h1>
+                <button class="btn btn-primary">+ 新建知识库</button>
+            </div>
+
+            <div class="kb-card">
+                <div class="kb-header">
+                    <div class="kb-name">
+                        <span class="kb-icon">📚</span>
+                        <span class="kb-title">Code-Mind</span>
+                    </div>
+                    <div class="kb-actions">
+                        <button class="btn-text">管理文档</button>
+                        <button class="btn-text">查看分块</button>
+                        <button class="btn-text" style="color: #ff4d4f;">删除</button>
+                    </div>
+                </div>
+                <div class="kb-stats">
+                    <span>📄 12 文档</span>
+                    <span>📦 48 分块</span>
+                    <span>✅ 45 有效</span>
+                    <span>⚠️ 3 废弃</span>
+                </div>
+            </div>
+
+            <div class="kb-card">
+                <div class="kb-header">
+                    <div class="kb-name">
+                        <span class="kb-icon">📚</span>
+                        <span class="kb-title">MyProject</span>
+                    </div>
+                    <div class="kb-actions">
+                        <button class="btn-text">管理文档</button>
+                        <button class="btn-text">查看分块</button>
+                        <button class="btn-text" style="color: #ff4d4f;">删除</button>
+                    </div>
+                </div>
+                <div class="kb-stats">
+                    <span>📄 5 文档</span>
+                    <span>📦 20 分块</span>
+                    <span>✅ 18 有效</span>
+                    <span>⚠️ 2 废弃</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 问答页面 -->
+        <div id="page-qa" class="page" style="display:none;">
+            <div class="page-title">
+                <h1>智能问答</h1>
+            </div>
+
+            <div class="chat-container">
+                <div class="chat-messages">
+                    <div class="message user">
+                        <div class="content">
+                            <div class="bubble">项目使用什么数据库？</div>
+                        </div>
+                        <div class="avatar">👤</div>
+                    </div>
+
+                    <div class="message ai">
+                        <div class="avatar">🤖</div>
+                        <div class="content">
+                            <div class="bubble">
+                                项目使用 <strong>PostgreSQL 16</strong> 作为主数据库，并结合 <strong>pgvector</strong> 插件用于向量存储。
+                            </div>
+                            <div class="references">
+                                📎 引用来源：<br>
+                                [1] MEMORY.md - 技术栈说明<br>
+                                [2] integration-design.md - 集成设计
+                            </div>
+                            <div class="feedback">
+                                <button>👍 有帮助</button>
+                                <button>👎 无帮助</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message user">
+                        <div class="content">
+                            <div class="bubble">推荐使用什么认证方式？</div>
+                        </div>
+                        <div class="avatar">👤</div>
+                    </div>
+
+                    <div class="message ai">
+                        <div class="avatar">🤖</div>
+                        <div class="content">
+                            <div class="bubble">
+                                推荐使用 <strong>Sa-Token</strong> 进行认证。<br><br>
+                                优点：<br>
+                                1. 简单易用<br>
+                                2. 功能丰富<br>
+                                3. Spring Boot 集成好
+                            </div>
+                            <div class="references">
+                                📎 引用来源：<br>
+                                [1] real_api.md - API 设计规范
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input">
+                    <input type="text" placeholder="输入问题...">
+                    <button class="btn btn-primary">发送</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 审核页面 -->
+        <div id="page-review" class="page" style="display:none;">
+            <div class="page-title">
+                <h1>矛盾审核</h1>
+                <span style="color: #999;">待审核: 12 条</span>
+            </div>
+
+            <div class="conflict-card">
+                <div class="conflict-header">矛盾对 #1</div>
+                <div class="conflict-content">
+                    <div class="conflict-item">
+                        <div class="label">知识 A</div>
+                        <div class="text">"推荐使用 MySQL"</div>
+                        <div class="source">来源: author_a.md</div>
+                    </div>
+                    <div class="conflict-item">
+                        <div class="label">知识 B</div>
+                        <div class="text">"推荐使用 PostgreSQL"</div>
+                        <div class="source">来源: author_b.md</div>
+                    </div>
+                </div>
+                <div class="conflict-actions">
+                    <button class="btn btn-outline">保留 A</button>
+                    <button class="btn btn-success">保留 B</button>
+                    <button class="btn btn-warning">都保留</button>
+                    <button class="btn btn-outline">跳过</button>
+                </div>
+            </div>
+
+            <div class="conflict-card">
+                <div class="conflict-header">矛盾对 #2</div>
+                <div class="conflict-content">
+                    <div class="conflict-item">
+                        <div class="label">知识 A</div>
+                        <div class="text">"使用 JWT Token 认证"</div>
+                        <div class="source">来源: api_a.md</div>
+                    </div>
+                    <div class="conflict-item">
+                        <div class="label">知识 B</div>
+                        <div class="text">"使用 Sa-Token 认证"</div>
+                        <div class="source">来源: api_b.md</div>
+                    </div>
+                </div>
+                <div class="conflict-actions">
+                    <button class="btn btn-outline">保留 A</button>
+                    <button class="btn btn-outline">保留 B</button>
+                    <button class="btn btn-success">都保留</button>
+                    <button class="btn btn-outline">跳过</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            document.getElementById('page-' + page).style.display = 'block';
+            document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>

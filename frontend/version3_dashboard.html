@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code-Mind - 版本三：仪表盘风格</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+
+        /* 顶部导航 */
+        .header { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
+        .logo-text { font-size: 18px; font-weight: 600; color: #333; }
+        .nav { display: flex; gap: 8px; }
+        .nav-btn { padding: 8px 16px; border: none; background: none; cursor: pointer; border-radius: 6px; font-size: 14px; color: #666; }
+        .nav-btn:hover, .nav-btn.active { background: #f0f0f0; color: #333; }
+        .user-info { display: flex; align-items: center; gap: 12px; }
+        .avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; }
+
+        /* 主内容 */
+        .main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+        /* 统计卡片 */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
+        .stat-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; top: 0; right: 0; width: 100px; height: 100px; border-radius: 50%; transform: translate(30%, -30%); }
+        .stat-card:nth-child(1)::before { background: rgba(102, 126, 234, 0.1); }
+        .stat-card:nth-child(2)::before { background: rgba(82, 196, 26, 0.1); }
+        .stat-card:nth-child(3)::before { background: rgba(250, 173, 20, 0.1); }
+        .stat-card:nth-child(4)::before { background: rgba(24, 144, 255, 0.1); }
+        .stat-icon { font-size: 32px; margin-bottom: 12px; }
+        .stat-value { font-size: 36px; font-weight: 700; color: #333; margin-bottom: 4px; }
+        .stat-label { font-size: 14px; color: #666; }
+        .stat-trend { font-size: 12px; margin-top: 8px; }
+        .stat-trend.up { color: #52c41a; }
+        .stat-trend.down { color: #ff4d4f; }
+
+        /* 图表区域 */
+        .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px; }
+        .chart-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; padding: 24px; }
+        .chart-title { font-size: 16px; font-weight: 500; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .chart-area { height: 200px; background: linear-gradient(180deg, #f0f5ff 0%, #fff 100%); border-radius: 8px; display: flex; align-items: flex-end; padding: 20px; gap: 8px; }
+        .chart-bar { flex: 1; background: linear-gradient(180deg, #667eea, #764ba2); border-radius: 4px 4px 0 0; min-height: 20px; }
+
+        /* 知识质量饼图 */
+        .quality-chart { display: flex; align-items: center; gap: 24px; }
+        .pie { width: 150px; height: 150px; border-radius: 50%; background: conic-gradient(#52c41a 0% 80%, #faad14 80% 95%, #ff4d4f 95% 100%); position: relative; }
+        .pie::after { content: ''; position: absolute; top: 30px; left: 30px; right: 30px; bottom: 30px; background: #fff; border-radius: 50%; }
+        .pie-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 1; }
+        .pie-value { font-size: 24px; font-weight: 700; color: #333; }
+        .pie-label { font-size: 12px; color: #666; }
+        .legend { display: flex; flex-direction: column; gap: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+        /* 最近活动 */
+        .activity-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+        .activity-list { list-style: none; }
+        .activity-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .activity-icon.upload { background: #e6f7ff; }
+        .activity-icon.review { background: #f6ffed; }
+        .activity-icon.delete { background: #fff2e8; }
+        .activity-icon.create { background: #f9f0ff; }
+        .activity-content { flex: 1; }
+        .activity-text { font-size: 14px; color: #333; }
+        .activity-time { font-size: 12px; color: #999; margin-top: 4px; }
+
+        /* 快速问答 */
+        .quick-qa { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; padding: 24px; }
+        .qa-input-wrap { display: flex; gap: 12px; margin-bottom: 20px; }
+        .qa-input { flex: 1; padding: 14px 20px; border: 2px solid #e8e8e8; border-radius: 12px; font-size: 15px; outline: none; transition: border-color 0.3s; }
+        .qa-input:focus { border-color: #667eea; }
+        .qa-btn { padding: 14px 28px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 12px; font-size: 15px; cursor: pointer; }
+        .qa-result { background: #f9f9f9; border-radius: 12px; padding: 20px; }
+        .qa-question { font-size: 14px; color: #666; margin-bottom: 12px; }
+        .qa-answer { font-size: 15px; color: #333; line-height: 1.6; }
+        .qa-refs { margin-top: 12px; padding: 12px; background: #fffbe6; border-radius: 8px; font-size: 12px; color: #666; }
+
+        /* 模态框 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: #fff; border-radius: 16px; padding: 32px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-title { font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+        .modal-close { float: right; background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+
+        /* 知识库列表 */
+        .kb-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .kb-card { background: rgba(255,255,255,0.95); border-radius: 12px; padding: 20px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .kb-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+        .kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .kb-name { display: flex; align-items: center; gap: 8px; }
+        .kb-icon { font-size: 24px; }
+        .kb-title { font-size: 16px; font-weight: 500; }
+        .kb-stats { display: flex; gap: 16px; }
+        .kb-stat { text-align: center; }
+        .kb-stat-value { font-size: 20px; font-weight: 600; color: #667eea; }
+        .kb-stat-label { font-size: 11px; color: #999; }
+        .kb-bar { height: 4px; background: #f0f0f0; border-radius: 2px; margin-top: 12px; overflow: hidden; }
+        .kb-bar-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 2px; }
+
+        /* 审核卡片 */
+        .review-card { background: rgba(255,255,255,0.95); border-radius: 16px; padding: 24px; margin-bottom: 16px; }
+        .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .review-id { font-weight: 500; }
+        .review-time { font-size: 12px; color: #999; }
+        .review-content { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .review-side { padding: 16px; background: #fafafa; border-radius: 8px; }
+        .review-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-bottom: 8px; }
+        .review-tag.a { background: #e6f7ff; color: #1890ff; }
+        .review-tag.b { background: #f6ffed; color: #52c41a; }
+        .review-text { font-size: 14px; line-height: 1.5; }
+        .review-source { font-size: 12px; color: #999; margin-top: 8px; }
+        .review-ai { padding: 12px; background: linear-gradient(135deg, #f0f5ff, #f9f0ff); border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+        .review-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .review-btn { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+        .review-btn.approve { background: #52c41a; color: #fff; }
+        .review-btn.reject { background: #ff4d4f; color: #fff; }
+        .review-btn.both { background: #faad14; color: #fff; }
+        .review-btn.skip { background: #f0f0f0; color: #666; }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">📚</div>
+            <span class="logo-text">Code-Mind</span>
+        </div>
+        <div class="nav">
+            <button class="nav-btn active" onclick="showPage('dashboard')">📊 仪表盘</button>
+            <button class="nav-btn" onclick="showPage('kb')">📚 知识库</button>
+            <button class="nav-btn" onclick="showPage('review')">⚠️ 审核</button>
+            <button class="nav-btn" onclick="showPage('qa')">💬 问答</button>
+        </div>
+        <div class="user-info">
+            <span>🔔</span>
+            <div class="avatar">A</div>
+            <span>管理员</span>
+        </div>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="main">
+        <!-- 仪表盘页面 -->
+        <div id="page-dashboard" class="page">
+            <!-- 统计卡片 -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-value">12</div>
+                    <div class="stat-label">知识库</div>
+                    <div class="stat-trend up">↑ 2 本周新增</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📄</div>
+                    <div class="stat-value">156</div>
+                    <div class="stat-label">文档总数</div>
+                    <div class="stat-trend up">↑ 12 本周新增</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⚠️</div>
+                    <div class="stat-value">12</div>
+                    <div class="stat-label">待审核</div>
+                    <div class="stat-trend down">↓ 3 较昨日</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💬</div>
+                    <div class="stat-value">42</div>
+                    <div class="stat-label">今日问答</div>
+                    <div class="stat-trend up">↑ 15 较昨日</div>
+                </div>
+            </div>
+
+            <!-- 图表区域 -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <span>📈 本周问答趋势</span>
+                        <span style="font-size: 12px; color: #999;">最近7天</span>
+                    </div>
+                    <div class="chart-area">
+                        <div class="chart-bar" style="height: 60%;"></div>
+                        <div class="chart-bar" style="height: 80%;"></div>
+                        <div class="chart-bar" style="height: 45%;"></div>
+                        <div class="chart-bar" style="height: 90%;"></div>
+                        <div class="chart-bar" style="height: 70%;"></div>
+                        <div class="chart-bar" style="height: 85%;"></div>
+                        <div class="chart-bar" style="height: 100%;"></div>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">📊 知识质量</div>
+                    <div class="quality-chart">
+                        <div class="pie">
+                            <div class="pie-center">
+                                <div class="pie-value">80%</div>
+                                <div class="pie-label">有效</div>
+                            </div>
+                        </div>
+                        <div class="legend">
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background: #52c41a;"></div>
+                                <span>有效 80%</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background: #faad14;"></div>
+                                <span>待审核 15%</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background: #ff4d4f;"></div>
+                                <span>已废弃 5%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 最近活动 -->
+            <div class="activity-card">
+                <div class="chart-title">📋 最近活动</div>
+                <ul class="activity-list">
+                    <li class="activity-item">
+                        <div class="activity-icon upload">📤</div>
+                        <div class="activity-content">
+                            <div class="activity-text">上传文档 <strong>MEMORY.md</strong> 到 <strong>Code-Mind</strong></div>
+                            <div class="activity-time">2 分钟前 · 管理员</div>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-icon review">✅</div>
+                        <div class="activity-content">
+                            <div class="activity-text">审核通过矛盾对 <strong>#123</strong></div>
+                            <div class="activity-time">15 分钟前 · 审核员</div>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-icon delete">🗑️</div>
+                        <div class="activity-content">
+                            <div class="activity-text">AI 自动删除过时知识 <strong>3 条</strong></div>
+                            <div class="activity-time">45 分钟前 · 系统</div>
+                        </div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-icon create">➕</div>
+                        <div class="activity-content">
+                            <div class="activity-text">新建知识库 <strong>MyProject</strong></div>
+                            <div class="activity-time">1 小时前 · 管理员</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 快速问答 -->
+            <div class="quick-qa">
+                <div class="chart-title">💬 快速问答</div>
+                <div class="qa-input-wrap">
+                    <input class="qa-input" type="text" placeholder="输入问题，快速获取答案...">
+                    <button class="qa-btn">提问</button>
+                </div>
+                <div class="qa-result">
+                    <div class="qa-question">Q: 项目使用什么数据库？</div>
+                    <div class="qa-answer">
+                        A: 项目使用 <strong>PostgreSQL 16</strong> 作为主数据库，并结合 <strong>pgvector</strong> 插件用于向量存储。
+                    </div>
+                    <div class="qa-refs">
+                        📎 引用来源：MEMORY.md, integration-design.md
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 知识库页面 -->
+        <div id="page-kb" class="page" style="display:none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color: #fff;">📚 知识库管理</h2>
+                <button class="qa-btn" style="padding: 10px 20px;">+ 新建知识库</button>
+            </div>
+
+            <div class="kb-grid">
+                <div class="kb-card">
+                    <div class="kb-header">
+                        <div class="kb-name">
+                            <span class="kb-icon">📚</span>
+                            <span class="kb-title">Code-Mind</span>
+                        </div>
+                    </div>
+                    <div class="kb-stats">
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">12</div>
+                            <div class="kb-stat-label">文档</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">48</div>
+                            <div class="kb-stat-label">分块</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">45</div>
+                            <div class="kb-stat-label">有效</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">3</div>
+                            <div class="kb-stat-label">废弃</div>
+                        </div>
+                    </div>
+                    <div class="kb-bar">
+                        <div class="kb-bar-fill" style="width: 94%;"></div>
+                    </div>
+                </div>
+
+                <div class="kb-card">
+                    <div class="kb-header">
+                        <div class="kb-name">
+                            <span class="kb-icon">📚</span>
+                            <span class="kb-title">MyProject</span>
+                        </div>
+                    </div>
+                    <div class="kb-stats">
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">5</div>
+                            <div class="kb-stat-label">文档</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">20</div>
+                            <div class="kb-stat-label">分块</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">18</div>
+                            <div class="kb-stat-label">有效</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">2</div>
+                            <div class="kb-stat-label">废弃</div>
+                        </div>
+                    </div>
+                    <div class="kb-bar">
+                        <div class="kb-bar-fill" style="width: 90%;"></div>
+                    </div>
+                </div>
+
+                <div class="kb-card">
+                    <div class="kb-header">
+                        <div class="kb-name">
+                            <span class="kb-icon">📚</span>
+                            <span class="kb-title">TestProject</span>
+                        </div>
+                    </div>
+                    <div class="kb-stats">
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">3</div>
+                            <div class="kb-stat-label">文档</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">12</div>
+                            <div class="kb-stat-label">分块</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">12</div>
+                            <div class="kb-stat-label">有效</div>
+                        </div>
+                        <div class="kb-stat">
+                            <div class="kb-stat-value">0</div>
+                            <div class="kb-stat-label">废弃</div>
+                        </div>
+                    </div>
+                    <div class="kb-bar">
+                        <div class="kb-bar-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 审核页面 -->
+        <div id="page-review" class="page" style="display:none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color: #fff;">⚠️ 矛盾审核</h2>
+                <span style="color: rgba(255,255,255,0.8);">待审核: 12 条</span>
+            </div>
+
+            <div class="review-card">
+                <div class="review-header">
+                    <span class="review-id">矛盾对 #1</span>
+                    <span class="review-time">2026-08-30 10:30</span>
+                </div>
+                <div class="review-content">
+                    <div class="review-side">
+                        <span class="review-tag a">A</span>
+                        <div class="review-text">"推荐使用 MySQL"</div>
+                        <div class="review-source">来源: author_a.md · 置信度: 3</div>
+                    </div>
+                    <div class="review-side">
+                        <span class="review-tag b">B</span>
+                        <div class="review-text">"推荐使用 PostgreSQL"</div>
+                        <div class="review-source">来源: author_b.md · 置信度: 5</div>
+                    </div>
+                </div>
+                <div class="review-ai">
+                    🤖 AI 分析: B 更可靠，A 是过时信息。PostgreSQL 是当前使用的数据库。
+                </div>
+                <div class="review-actions">
+                    <button class="review-btn approve">保留 A</button>
+                    <button class="review-btn reject">保留 B ✓</button>
+                    <button class="review-btn both">都保留</button>
+                    <button class="review-btn skip">跳过</button>
+                </div>
+            </div>
+
+            <div class="review-card">
+                <div class="review-header">
+                    <span class="review-id">矛盾对 #2</span>
+                    <span class="review-time">2026-08-30 10:25</span>
+                </div>
+                <div class="review-content">
+                    <div class="review-side">
+                        <span class="review-tag a">A</span>
+                        <div class="review-text">"使用 JWT Token 认证"</div>
+                        <div class="review-source">来源: api_a.md · 置信度: 4</div>
+                    </div>
+                    <div class="review-side">
+                        <span class="review-tag b">B</span>
+                        <div class="review-text">"使用 Sa-Token 认证"</div>
+                        <div class="review-source">来源: api_b.md · 置信度: 4</div>
+                    </div>
+                </div>
+                <div class="review-ai">
+                    🤖 AI 分析: 两个观点都有道理，无法判断哪个是最新版本。
+                </div>
+                <div class="review-actions">
+                    <button class="review-btn approve">保留 A</button>
+                    <button class="review-btn approve">保留 B</button>
+                    <button class="review-btn reject">都保留 ✓</button>
+                    <button class="review-btn skip">跳过</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 问答页面 -->
+        <div id="page-qa" class="page" style="display:none;">
+            <div style="max-width: 800px; margin: 0 auto;">
+                <h2 style="color: #fff; text-align: center; margin-bottom: 24px;">💬 智能问答</h2>
+
+                <div class="quick-qa">
+                    <div class="qa-input-wrap">
+                        <input class="qa-input" type="text" placeholder="输入问题..." id="qa-input">
+                        <button class="qa-btn" onclick="askQuestion()">发送</button>
+                    </div>
+
+                    <div id="qa-messages">
+                        <div class="qa-result" style="margin-bottom: 16px;">
+                            <div class="qa-question">👤 项目使用什么数据库？</div>
+                            <div class="qa-answer">
+                                🤖 项目使用 <strong>PostgreSQL 16</strong> 作为主数据库，并结合 <strong>pgvector</strong> 插件用于向量存储。
+                            </div>
+                            <div class="qa-refs">
+                                📎 引用来源：<br>
+                                [1] MEMORY.md - 技术栈说明<br>
+                                [2] integration-design.md - 集成设计
+                            </div>
+                        </div>
+
+                        <div class="qa-result" style="margin-bottom: 16px;">
+                            <div class="qa-question">👤 推荐使用什么认证方式？</div>
+                            <div class="qa-answer">
+                                🤖 推荐使用 <strong>Sa-Token</strong> 进行认证。<br><br>
+                                优点：<br>
+                                1. 简单易用<br>
+                                2. 功能丰富<br>
+                                3. Spring Boot 集成好
+                            </div>
+                            <div class="qa-refs">
+                                📎 引用来源：<br>
+                                [1] real_api.md - API 设计规范
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            document.getElementById('page-' + page).style.display = 'block';
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function askQuestion() {
+            const input = document.getElementById('qa-input');
+            const question = input.value.trim();
+            if (!question) return;
+
+            const messages = document.getElementById('qa-messages');
+            const qaDiv = document.createElement('div');
+            qaDiv.className = 'qa-result';
+            qaDiv.style.marginBottom = '16px';
+            qaDiv.innerHTML = `
+                <div class="qa-question">👤 ${question}</div>
+                <div class="qa-answer">🤖 正在思考中...</div>
+            `;
+            messages.appendChild(qaDiv);
+            input.value = '';
+
+            setTimeout(() => {
+                qaDiv.querySelector('.qa-answer').innerHTML = '🤖 这是一个示例回答，实际会调用 AI 接口获取答案。';
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
