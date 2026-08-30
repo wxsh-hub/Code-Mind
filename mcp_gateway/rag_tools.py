@@ -35,7 +35,7 @@ def search_experience_impl(
     top_k: int = 5,
 ) -> Dict[str, Any]:
     """
-    搜索企业项目经验和编码规范
+    搜索企业项目经验和编码规范（使用向量检索 + AI 回答）
 
     Args:
         query: 搜索内容，如"Spring Boot 分页实现"、"Git 提交规范"
@@ -43,36 +43,55 @@ def search_experience_impl(
         top_k: 返回结果数量，默认 5
 
     Returns:
-        包含搜索结果的字典
+        包含 AI 回答和原始搜索结果的字典
     """
     client = get_rag_client()
 
     try:
-        results = client.search_similar(query=query, kb_id=kb_id, top_k=top_k)
+        # 使用向量检索 + AI 回答（返回 AI 回答 + sources）
+        result = client.rag_chat_with_sources(query)
+        ai_answer = result.get("answer", "")
+        sources = result.get("sources", [])
 
-        # 格式化结果
+        # 记录引用（投票机制）
         formatted_results = []
-        for item in results:
-            formatted = {
-                "chunk_id": item.get("chunkId"),
-                "content": item.get("content", ""),
-                "doc_id": item.get("docId"),
-                "kb_id": item.get("kbId"),
-                "metadata": item.get("metadata", {}),
-            }
-            formatted_results.append(formatted)
+        for source in sources[:top_k]:
+            doc_id = source.get("docId")
+            doc_name = source.get("docName", "")
+            excerpt = source.get("excerpt", "")
 
-            # 记录引用（投票机制）
-            chunk_id = item.get("chunkId")
+            # 尝试获取 chunk_id
+            chunk_id = None
+            if doc_id:
+                try:
+                    chunks = client.get_chunks(doc_id)
+                    if chunks:
+                        records = chunks.get("records", []) if isinstance(chunks, dict) else chunks
+                        if records and len(records) > 0:
+                            first_chunk = records[0] if isinstance(records, list) else None
+                            if first_chunk and isinstance(first_chunk, dict):
+                                chunk_id = first_chunk.get("id")
+                except Exception:
+                    pass
+
+            # 记录引用
             if chunk_id:
                 try:
                     client.record_reference(chunk_id)
                 except Exception as e:
                     logger.warning(f"Failed to record reference for {chunk_id}: {e}")
 
+            formatted_results.append({
+                "chunk_id": chunk_id,
+                "content": excerpt,
+                "doc_id": doc_id,
+                "doc_name": doc_name,
+            })
+
         return {
             "status": "success",
             "query": query,
+            "ai_answer": ai_answer,
             "result_count": len(formatted_results),
             "results": formatted_results,
         }
@@ -83,6 +102,7 @@ def search_experience_impl(
             "status": "error",
             "query": query,
             "error": str(e),
+            "ai_answer": "",
             "result_count": 0,
             "results": [],
         }
@@ -92,9 +112,10 @@ def search_experience_impl(
 SEARCH_EXPERIENCE_TOOL = {
     "name": "search_experience",
     "description": (
-        "搜索企业项目经验和编码规范。当用户询问技术实现、最佳实践、"
-        "编码规范、项目经验等问题时，使用此工具从企业知识库中检索相关信息。"
-        "返回的内容包含实际项目中的经验总结和规范文档。"
+        "搜索企业项目经验和编码规范。使用向量检索和 AI 回答，"
+        "当用户询问技术实现、最佳实践、编码规范、项目经验等问题时，"
+        "使用此工具从企业知识库中检索相关信息。"
+        "返回 AI 生成的回答和原始搜索结果。"
     ),
     "inputSchema": {
         "type": "object",
