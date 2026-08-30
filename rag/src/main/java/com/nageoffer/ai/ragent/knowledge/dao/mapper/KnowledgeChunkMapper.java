@@ -19,6 +19,14 @@ package com.nageoffer.ai.ragent.knowledge.dao.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeChunkDO;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 public interface KnowledgeChunkMapper extends BaseMapper<KnowledgeChunkDO> {
+
+    /**
+     * 使用原生 SQL 更新 chunk 的 metadata（支持 JSONB 类型）
+     */
+    @Update("UPDATE t_knowledge_chunk SET metadata = #{metadata}::jsonb WHERE doc_id = #{docId} AND deleted = 0")
+    int updateByNativeSql(@Param("docId") String docId, @Param("metadata") String metadata);
 }

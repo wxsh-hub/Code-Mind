@@ -23,6 +23,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.nageoffer.ai.ragent.framework.database.JsonbTypeHandler;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -138,6 +139,7 @@ public class KnowledgeChunkDO {
      * 存储功能编号、模块等信息：
      * {"feature_codes": ["2437"], "module": "user"}
      */
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private String metadata;
 
     /**

@@ -174,6 +174,8 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
                 .processMode(modeConfig.processMode().getValue())
                 .ingestionSpec(modeConfig.ingestionSpec())
                 .pipelineId(modeConfig.pipelineId())
+                .featureCodes(StrUtil.trimToNull(requestParam.getFeatureCodes()))
+                .module(StrUtil.trimToNull(requestParam.getModule()))
                 .createdBy(UserContext.getUsername())
                 .updatedBy(UserContext.getUsername())
                 .build();
@@ -292,6 +294,16 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
             refreshMimeType(docId, outcome.mimeType());
 
             markChunkSucceeded(docId, savedCount);
+            // 更新 chunk 的 metadata（featureCodes 和 module）
+            String featureCodes = documentDO.getFeatureCodes();
+            String module = documentDO.getModule();
+            log.info("准备更新 chunk metadata: docId={}, featureCodes={}, module={}", docId, featureCodes, module);
+            try {
+                updateChunkMetadata(docId, featureCodes, module);
+                log.info("chunk metadata 更新成功: docId={}", docId);
+            } catch (Exception e) {
+                log.error("chunk metadata 更新失败: docId={}", docId, e);
+            }
             long totalDuration = System.currentTimeMillis() - totalStartTime;
             updateChunkLog(chunkLog.getId(), DocumentStatus.SUCCESS.getCode(), savedCount,
                     extractDuration, chunkDuration, embedDuration, persistDuration, totalDuration, null);
@@ -315,6 +327,58 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
                 .status(DocumentStatus.SUCCESS.getCode())
                 .updatedBy(UserContext.getUsername())
                 .build());
+    }
+
+    /**
+     * 更新文档所有 chunk 的 metadata（featureCodes 和 module）
+     */
+    private void updateChunkMetadata(String docId, String featureCodes, String module) {
+        log.info("[updateChunkMetadata] 开始: docId={}, featureCodes={}, module={}", docId, featureCodes, module);
+
+        // 如果两者都为空，尝试从文档表重新读取
+        if (!StringUtils.hasText(featureCodes) && !StringUtils.hasText(module)) {
+            log.info("[updateChunkMetadata] featureCodes 和 module 都为空，尝试从文档表重新读取");
+            KnowledgeDocumentDO doc = documentMapper.selectById(docId);
+            if (doc != null) {
+                featureCodes = doc.getFeatureCodes();
+                module = doc.getModule();
+                log.info("[updateChunkMetadata] 重新读取结果: featureCodes={}, module={}", featureCodes, module);
+            }
+        }
+
+        if (!StringUtils.hasText(featureCodes) && !StringUtils.hasText(module)) {
+            log.info("[updateChunkMetadata] 跳过: featureCodes 和 module 都为空");
+            return;
+        }
+
+        try {
+            // 构建 metadata JSON
+            StringBuilder metadata = new StringBuilder("{");
+            if (StringUtils.hasText(featureCodes)) {
+                // 将逗号分隔的 featureCodes 转为 JSON 数组
+                String[] codes = featureCodes.split(",");
+                metadata.append("\"feature_codes\":[");
+                for (int i = 0; i < codes.length; i++) {
+                    if (i > 0) metadata.append(",");
+                    metadata.append("\"").append(codes[i].trim()).append("\"");
+                }
+                metadata.append("]");
+            }
+            if (StringUtils.hasText(module)) {
+                if (StringUtils.hasText(featureCodes)) metadata.append(",");
+                metadata.append("\"module\":\"").append(module).append("\"");
+            }
+            metadata.append("}");
+
+            String metadataJson = metadata.toString();
+            log.info("[updateChunkMetadata] 生成的 metadata JSON: {}", metadataJson);
+
+            // 使用原生 SQL 更新 chunk 的 metadata（因为 MyBatis-Plus 的 LambdaUpdateWrapper 不支持 JSONB 类型）
+            chunkMapper.updateByNativeSql(docId, metadataJson);
+            log.info("[updateChunkMetadata] 完成: docId={}", docId);
+        } catch (Exception e) {
+            log.error("[updateChunkMetadata] 失败: docId={}", docId, e);
+        }
     }
 
     private void refreshMimeType(String docId, String mimeType) {
