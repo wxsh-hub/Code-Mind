@@ -33,6 +33,8 @@ export interface KnowledgeDocument {
   createTime?: string | null;
   updateTime?: string | null;
   chunksEdited?: boolean | null;
+  featureCodes?: string | null;
+  module?: string | null;
 }
 
 export interface KnowledgeChunk {
@@ -106,6 +108,8 @@ export interface KnowledgeDocumentUploadPayload {
   processMode?: "chunk" | "pipeline";
   ingestionSpec?: string | null;
   pipelineId?: string | null;
+  featureCodes?: string | null;
+  module?: string | null;
 }
 
 export interface KnowledgeChunkPageParams {
@@ -258,6 +262,12 @@ export const uploadDocument = async (
   }
   if (payload.pipelineId) {
     formData.append("pipelineId", payload.pipelineId);
+  }
+  if (payload.featureCodes) {
+    formData.append("featureCodes", payload.featureCodes);
+  }
+  if (payload.module) {
+    formData.append("module", payload.module);
   }
   return api.post<KnowledgeDocument, KnowledgeDocument>(`/knowledge-base/${kbId}/docs/upload`, formData, {
     headers: {

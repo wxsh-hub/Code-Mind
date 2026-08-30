@@ -811,6 +811,8 @@ export function KnowledgeDocumentsPage() {
                     <TableHead className="w-[110px]">状态</TableHead>
                     <TableHead className="w-[70px]">启用</TableHead>
                     <TableHead className="w-[80px]">分块数</TableHead>
+                    <TableHead className="w-[100px]">模块</TableHead>
+                    <TableHead className="w-[100px]">功能编号</TableHead>
                     <TableHead className="w-[120px]">处理模式</TableHead>
                     <TableHead className="w-[170px]">更新时间</TableHead>
                     <TableHead className="w-[170px] text-left">操作</TableHead>
@@ -891,6 +893,20 @@ export function KnowledgeDocumentsPage() {
                     <TableCell>
                       {doc.chunkCount != null && doc.chunkCount > 0 ? (
                         <span className="tabular-nums">{doc.chunkCount}</span>
+                      ) : (
+                        <span className="text-muted-foreground/50">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {doc.module ? (
+                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{doc.module}</span>
+                      ) : (
+                        <span className="text-muted-foreground/50">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {doc.featureCodes ? (
+                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">{doc.featureCodes}</span>
                       ) : (
                         <span className="text-muted-foreground/50">-</span>
                       )}
@@ -1435,7 +1451,10 @@ const uploadSchema = z
     maxChars: z.string().optional(),
     overlapChars: z.string().optional(),
     rowsPerChunk: z.string().optional(),
-    toleranceFactor: z.string().optional()
+    toleranceFactor: z.string().optional(),
+    // 元数据标记
+    featureCodes: z.string().optional(),
+    module: z.string().optional()
   })
   .superRefine((values, ctx) => {
     const isBlank = (value?: string) => !value || value.trim() === "";
@@ -1639,7 +1658,9 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
             : null,
         processMode: values.processMode,
         ingestionSpec: ingestionSpec ?? null,
-        pipelineId: values.processMode === "pipeline" ? values.pipelineId : null
+        pipelineId: values.processMode === "pipeline" ? values.pipelineId : null,
+        featureCodes: values.featureCodes?.trim() || null,
+        module: values.module?.trim() || null
       };
       await onSubmit(payload);
     } catch (error) {
@@ -1957,6 +1978,39 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
                   </div>
                 </div>
             ) : null}
+            </div>
+
+            {/* 元数据标记 */}
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="text-sm font-medium">元数据标记（可选）</div>
+              <FormField
+                control={form.control}
+                name="featureCodes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>功能编号</FormLabel>
+                    <FormControl>
+                      <Input placeholder="如：F001,F002（多个用逗号分隔）" {...field} />
+                    </FormControl>
+                    <FormDescription>标记文档属于哪些功能</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="module"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>所属模块</FormLabel>
+                    <FormControl>
+                      <Input placeholder="如：user、order" {...field} />
+                    </FormControl>
+                    <FormDescription>标记文档属于哪个模块</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <DialogFooter>
