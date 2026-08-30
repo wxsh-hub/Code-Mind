@@ -161,6 +161,15 @@ class TestMemoryManager(unittest.TestCase):
         list_resp.__enter__ = lambda s: s
         list_resp.__exit__ = MagicMock(return_value=False)
 
+        # Mock search features (for auto-detection)
+        features_resp = MagicMock()
+        features_resp.read.return_value = json.dumps({
+            "code": "0",
+            "data": [],
+        }).encode("utf-8")
+        features_resp.__enter__ = lambda s: s
+        features_resp.__exit__ = MagicMock(return_value=False)
+
         # Mock search
         search_resp = MagicMock()
         search_resp.read.return_value = json.dumps({
@@ -178,7 +187,7 @@ class TestMemoryManager(unittest.TestCase):
         ref_resp.__enter__ = lambda s: s
         ref_resp.__exit__ = MagicMock(return_value=False)
 
-        mock_urlopen.side_effect = [login_resp, list_resp, search_resp, ref_resp]
+        mock_urlopen.side_effect = [login_resp, list_resp, features_resp, search_resp, ref_resp]
 
         manager = MemoryManager(MemoryConfig())
         result = manager.ask_project("TestProject", "RAG 完成度")

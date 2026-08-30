@@ -29,10 +29,43 @@ def set_rag_client(client: RAGClient):
     _rag_client = client
 
 
+def _is_outdated_content(ai_answer: str, source_excerpt: str) -> bool:
+    """
+    判断源内容是否被 AI 标记为过时/错误
+
+    通过分析 AI 回答，判断对应的源内容是否被标记为过时。
+    只有当 AI 明确指出某个来源是过时的，才会返回 True。
+    """
+    # AI 回答中明确指出过时的表述
+    outdated_patterns = [
+        "已过时", "过时的", "过时版本",
+        "错误的", "错误版本",
+        "已弃用", "已废弃",
+        "已迁移", "已替换",
+        "已被", "不再使用",
+        "请勿参考", "请勿使用",
+    ]
+
+    # 检查 AI 回答是否提到过时
+    answer_has_outdated = any(pattern in ai_answer for pattern in outdated_patterns)
+
+    if not answer_has_outdated:
+        return False
+
+    # 检查源内容是否包含过时标记
+    source_patterns = [
+        "过时", "错误", "已弃用", "已迁移", "已替换",
+        "请勿参考", "请勿使用", "旧版本", "不再使用",
+    ]
+
+    return any(pattern in source_excerpt for pattern in source_patterns)
+
+
 def search_experience_impl(
     query: str,
     kb_id: Optional[str] = None,
     top_k: int = 5,
+    auto_deprecate: bool = True,
 ) -> Dict[str, Any]:
     """
     搜索企业项目经验和编码规范（使用向量检索 + AI 回答）
@@ -41,6 +74,7 @@ def search_experience_impl(
         query: 搜索内容，如"Spring Boot 分页实现"、"Git 提交规范"
         kb_id: 限定知识库 ID（可选，默认搜索所有）
         top_k: 返回结果数量，默认 5
+        auto_deprecate: 是否自动标记过时知识（默认 True）
 
     Returns:
         包含 AI 回答和原始搜索结果的字典
@@ -55,6 +89,8 @@ def search_experience_impl(
 
         # 记录引用（投票机制）
         formatted_results = []
+        deprecated_chunks = []
+
         for source in sources[:top_k]:
             doc_id = source.get("docId")
             doc_name = source.get("docName", "")
@@ -81,6 +117,19 @@ def search_experience_impl(
                 except Exception as e:
                     logger.warning(f"Failed to record reference for {chunk_id}: {e}")
 
+                # 检查是否包含过时信息（AI 回答中提到的）
+                if auto_deprecate and _is_outdated_content(ai_answer, excerpt):
+                    try:
+                        client.deprecate_chunk(chunk_id)
+                        deprecated_chunks.append({
+                            "chunk_id": chunk_id,
+                            "doc_name": doc_name,
+                            "reason": "AI 判断为过时/错误知识",
+                        })
+                        logger.info(f"Auto-deprecated chunk {chunk_id} from {doc_name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to deprecate chunk {chunk_id}: {e}")
+
             formatted_results.append({
                 "chunk_id": chunk_id,
                 "content": excerpt,
@@ -94,6 +143,8 @@ def search_experience_impl(
             "ai_answer": ai_answer,
             "result_count": len(formatted_results),
             "results": formatted_results,
+            "deprecated_chunks": deprecated_chunks,
+            "deprecated_count": len(deprecated_chunks),
         }
 
     except Exception as e:
@@ -105,6 +156,8 @@ def search_experience_impl(
             "ai_answer": "",
             "result_count": 0,
             "results": [],
+            "deprecated_chunks": [],
+            "deprecated_count": 0,
         }
 
 
@@ -116,6 +169,7 @@ SEARCH_EXPERIENCE_TOOL = {
         "当用户询问技术实现、最佳实践、编码规范、项目经验等问题时，"
         "使用此工具从企业知识库中检索相关信息。"
         "返回 AI 生成的回答和原始搜索结果。"
+        "如果 AI 判断某些知识已过时，会自动标记为废弃。"
     ),
     "inputSchema": {
         "type": "object",

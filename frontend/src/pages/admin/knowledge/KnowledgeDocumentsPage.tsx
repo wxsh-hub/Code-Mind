@@ -37,6 +37,7 @@ import {
 } from "@/services/knowledgeService";
 import { getIngestionPipelines, type IngestionPipeline } from "@/services/ingestionService";
 import { getSystemSettings } from "@/services/settingsService";
+import { getModules, getFeatures, type Module, type Feature } from "@/services/moduleService";
 import { DocumentPreview, isDocxType, isImageType, isPreviewableType, isSpreadsheetType } from "@/components/document/DocumentPreview";
 import { getErrorMessage } from "@/utils/error";
 
@@ -1535,6 +1536,9 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
   const [pipelines, setPipelines] = useState<IngestionPipeline[]>([]);
   const [loadingPipelines, setLoadingPipelines] = useState(false);
   const [maxFileSize, setMaxFileSize] = useState<number>(50 * 1024 * 1024);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [features, setFeatures] = useState<Feature[]>([]);
+  const [loadingModules, setLoadingModules] = useState(false);
 
   const form = useForm<UploadFormValues>({
     resolver: zodResolver(uploadSchema),
@@ -1583,6 +1587,22 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
     }
   };
 
+  const loadModulesAndFeatures = async () => {
+    setLoadingModules(true);
+    try {
+      const [modulesData, featuresData] = await Promise.all([
+        getModules(),
+        getFeatures(),
+      ]);
+      setModules(modulesData || []);
+      setFeatures(featuresData || []);
+    } catch (error) {
+      console.error("加载模块/功能失败", error);
+    } finally {
+      setLoadingModules(false);
+    }
+  };
+
   useEffect(() => {
     if (open) {
       setFile(null);
@@ -1599,6 +1619,7 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
       setNoChunk(false);
       setShowAdvanced(false);
       loadPipelines();
+      loadModulesAndFeatures();
       getIngestionSpecSchema().then(setSpecSchema).catch(() => {});
       getSystemSettings()
         .then((settings) => setMaxFileSize(settings.upload.maxFileSize))
@@ -1982,17 +2003,42 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
 
             {/* 元数据标记 */}
             <div className="space-y-3 rounded-lg border p-3">
-              <div className="text-sm font-medium">元数据标记（可选）</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium">元数据标记</div>
+                <div className="flex gap-2">
+                  <a href="/admin/feature-metadata" target="_blank" className="text-xs text-blue-500 hover:underline">
+                    + 创建功能
+                  </a>
+                  <a href="/admin/modules" target="_blank" className="text-xs text-blue-500 hover:underline">
+                    + 创建模块
+                  </a>
+                </div>
+              </div>
               <FormField
                 control={form.control}
                 name="featureCodes"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>功能编号</FormLabel>
-                    <FormControl>
-                      <Input placeholder="如：F001,F002（多个用逗号分隔）" {...field} />
-                    </FormControl>
-                    <FormDescription>标记文档属于哪些功能</FormDescription>
+                    <Select
+                      value={field.value || "__none__"}
+                      onValueChange={(value) => field.onChange(value === "__none__" ? undefined : value)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingModules ? "加载中..." : "选择功能编号"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">不指定</SelectItem>
+                        {features.map((feat) => (
+                          <SelectItem key={feat.featureCode} value={feat.featureCode}>
+                            {feat.featureCode} - {feat.featureName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>标记文档属于哪个功能</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -2003,9 +2049,24 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>所属模块</FormLabel>
-                    <FormControl>
-                      <Input placeholder="如：user、order" {...field} />
-                    </FormControl>
+                    <Select
+                      value={field.value || "__none__"}
+                      onValueChange={(value) => field.onChange(value === "__none__" ? undefined : value)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingModules ? "加载中..." : "选择所属模块"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">不指定</SelectItem>
+                        {modules.map((mod) => (
+                          <SelectItem key={mod.name} value={mod.name}>
+                            {mod.name} - {mod.description || "无描述"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormDescription>标记文档属于哪个模块</FormDescription>
                     <FormMessage />
                   </FormItem>
