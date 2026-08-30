@@ -97,6 +97,46 @@ public class FeatureMetadataApiController {
     }
 
     /**
+     * 搜索功能元数据（模糊匹配功能名称和描述）
+     * 支持多个关键词，用空格分隔，任意一个关键词匹配即返回
+     */
+    @GetMapping("/feature-metadata/search")
+    public Result<List<FeatureMetadataDO>> searchFeatures(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "5") int limit) {
+        // 分割关键词（支持空格、逗号、句号等分隔符）
+        String[] keywords = keyword.split("[\\s,.!?;:]+");
+
+        LambdaQueryWrapper<FeatureMetadataDO> wrapper = new LambdaQueryWrapper<FeatureMetadataDO>()
+                .eq(FeatureMetadataDO::getDeleted, 0)
+                .eq(FeatureMetadataDO::getStatus, "active");
+
+        // 对任意一个关键词进行模糊匹配（OR 关系）
+        if (keywords.length > 0) {
+            wrapper.and(w -> {
+                boolean[] first = {true};
+                for (String kw : keywords) {
+                    final String trimmedKw = kw.trim();
+                    if (trimmedKw.isEmpty() || trimmedKw.length() < 2) continue;
+
+                    if (!first[0]) {
+                        w.or();
+                    }
+                    w.and(inner -> inner
+                            .like(FeatureMetadataDO::getFeatureName, trimmedKw)
+                            .or()
+                            .like(FeatureMetadataDO::getDescription, trimmedKw)
+                    );
+                    first[0] = false;
+                }
+            });
+        }
+
+        wrapper.last("LIMIT " + limit);
+        return Results.success(featureMapper.selectList(wrapper));
+    }
+
+    /**
      * 获取功能详情
      */
     @GetMapping("/feature-metadata/{code}")
