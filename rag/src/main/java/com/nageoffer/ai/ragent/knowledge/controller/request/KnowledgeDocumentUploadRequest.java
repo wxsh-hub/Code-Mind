@@ -62,4 +62,16 @@ public class KnowledgeDocumentUploadRequest {
      * 仅在 processMode=pipeline 时有效
      */
     private String pipelineId;
+
+    /**
+     * 功能编号列表（逗号分隔），用于元数据标注
+     * 例如：2437,2438
+     */
+    private String featureCodes;
+
+    /**
+     * 模块名称，用于元数据标注
+     * 例如：user、order、payment
+     */
+    private String module;
 }
