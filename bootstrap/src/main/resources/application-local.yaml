@@ -1,13 +1,13 @@
 ai:
   providers:
     bailian:
-      api-key: sk-ws-H.EXRRLER.M7hA.MEQCICBRV094j86gGeT_xXL3IS4INaZhcjELgHLbX6MRRLUHAiAdEIfjkUsi6AUY9CpXR3lCZFerQWUq1OAEpjk83A_4jA
+      api-key: ${BAILIAN_API_KEY:}
       url: https://dashscope.aliyuncs.com
       endpoints:
         chat: /compatible-mode/v1/chat/completions
         embedding: /compatible-mode/v1/embeddings
     siliconflow:
-      api-key: sk-bgjmqvxuivmjzrapzdmpqvfwpumrebswxjuynbxfvzicbeto
+      api-key: ${SILICONFLOW_API_KEY:}
 
 rag:
   mcp:
