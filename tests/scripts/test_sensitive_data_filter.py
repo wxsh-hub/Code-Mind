@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 敏感数据过滤测试 - 验证 RAG 搜索结果是否有脱敏处理
@@ -11,7 +12,7 @@
 import sys
 import re
 import time
-sys.path.insert(0, ".")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
 from mcp_gateway.rag_client import RAGClient, RAGConfig
 

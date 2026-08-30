@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 全链路体验测试 - 详细记录每个功能的使用体验
@@ -12,7 +13,7 @@ from typing import Dict, Any, List
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-sys.path.insert(0, ".")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
 from mcp_gateway.rag_client import RAGClient, RAGConfig
 from mcp_gateway.memory_tools import MemoryManager, MemoryConfig, upload_memory_impl, ask_project_impl, list_projects_impl, delete_memory_impl

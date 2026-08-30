@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 问题修复验证测试 - 针对测试中发现的具体问题
@@ -18,7 +19,7 @@ from typing import Dict, Any, List
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-sys.path.insert(0, ".")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
 from mcp_gateway.rag_client import RAGClient, RAGConfig
 from mcp_gateway.memory_tools import MemoryManager, MemoryConfig

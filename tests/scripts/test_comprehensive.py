@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 综合测试脚本 - 覆盖所有发现的问题
@@ -21,7 +22,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # 添加项目路径
-sys.path.insert(0, ".")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
 from mcp_gateway.rag_client import RAGClient, RAGConfig
 from mcp_gateway.memory_tools import MemoryManager, MemoryConfig
