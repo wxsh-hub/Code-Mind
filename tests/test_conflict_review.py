@@ -46,7 +46,7 @@ class TestConflictReviewTools(unittest.TestCase):
         result = list_conflicts_impl("TestProject")
 
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["count"], 0)
+        self.assertEqual(result["pagination"]["total"], 0)
 
     def test_list_conflicts_found(self):
         """测试列出矛盾对（找到）"""
@@ -56,11 +56,13 @@ class TestConflictReviewTools(unittest.TestCase):
                     "chunkId": "1",
                     "content": "应该使用 Redis 缓存",
                     "confidence": 5,
+                    "score": 0.9,
                 },
                 {
                     "chunkId": "2",
                     "content": "不应该使用 Redis 缓存",
                     "confidence": 4,
+                    "score": 0.8,
                 },
             ]
         }
@@ -68,7 +70,7 @@ class TestConflictReviewTools(unittest.TestCase):
         result = list_conflicts_impl("TestProject")
 
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["pagination"]["total"], 1)
         self.assertEqual(result["conflicts"][0]["contradiction_type"], "negation")
 
     def test_review_conflict_winner_a(self):

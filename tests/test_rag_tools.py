@@ -17,36 +17,37 @@ class TestRAGTools(unittest.TestCase):
 
     def test_search_experience_success(self):
         """测试 search_experience 成功场景"""
-        self.mock_client.search_similar.return_value = [
-            {
-                "chunkId": "123",
-                "content": "Spring Boot 分页使用 PageHelper",
-                "docId": "1",
-                "kbId": "10",
-                "metadata": {"voteCount": 5, "deprecated": False},
-            },
-            {
-                "chunkId": "456",
-                "content": "MyBatis Plus 分页配置",
-                "docId": "2",
-                "kbId": "10",
-                "metadata": {"voteCount": 3, "deprecated": False},
-            },
-        ]
+        # mock rag_chat_with_sources
+        self.mock_client.rag_chat_with_sources.return_value = {
+            "answer": "Spring Boot 分页使用 PageHelper",
+            "sources": [
+                {
+                    "docId": "1",
+                    "docName": "test.md",
+                    "excerpt": "Spring Boot 分页使用 PageHelper",
+                },
+                {
+                    "docId": "2",
+                    "docName": "test2.md",
+                    "excerpt": "MyBatis Plus 分页配置",
+                },
+            ],
+        }
+        # mock get_chunks
+        self.mock_client.get_chunks.return_value = {
+            "records": [{"id": "123"}]
+        }
 
         result = search_experience_impl(query="分页实现", top_k=5)
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["result_count"], 2)
         self.assertEqual(len(result["results"]), 2)
-        self.assertEqual(result["results"][0]["chunk_id"], "123")
-
-        # 验证记录引用被调用
-        self.assertEqual(self.mock_client.record_reference.call_count, 2)
+        self.assertIn("PageHelper", result["ai_answer"])
 
     def test_search_experience_error(self):
         """测试 search_experience 错误场景"""
-        self.mock_client.search_similar.side_effect = RuntimeError("Connection failed")
+        self.mock_client.rag_chat_with_sources.side_effect = RuntimeError("Connection failed")
 
         result = search_experience_impl(query="test")
 
@@ -54,27 +55,31 @@ class TestRAGTools(unittest.TestCase):
         self.assertIn("Connection failed", result["error"])
         self.assertEqual(result["result_count"], 0)
 
-    def test_search_experience_with_kb_id(self):
-        """测试限定知识库搜索"""
-        self.mock_client.search_similar.return_value = []
+    def test_search_experience_returns_ai_answer(self):
+        """测试 search_experience 返回 AI 回答"""
+        self.mock_client.rag_chat_with_sources.return_value = {
+            "answer": "根据知识库，推荐使用 PostgreSQL",
+            "sources": [
+                {"docId": "1", "docName": "db.md", "excerpt": "PostgreSQL 是最佳选择"},
+            ],
+        }
+        self.mock_client.get_chunks.return_value = {"records": [{"id": "789"}]}
 
-        search_experience_impl(query="test", kb_id="10", top_k=3)
+        result = search_experience_impl(query="推荐什么数据库")
 
-        self.mock_client.search_similar.assert_called_once_with(
-            query="test", kb_id="10", top_k=3,
-        )
+        self.assertEqual(result["status"], "success")
+        self.assertIn("PostgreSQL", result["ai_answer"])
+        self.assertEqual(result["result_count"], 1)
 
     def test_search_experience_records_references(self):
         """测试搜索后记录引用"""
-        self.mock_client.search_similar.return_value = [
-            {
-                "chunkId": "789",
-                "content": "test content",
-                "docId": "1",
-                "kbId": "10",
-                "metadata": {},
-            },
-        ]
+        self.mock_client.rag_chat_with_sources.return_value = {
+            "answer": "test answer",
+            "sources": [
+                {"docId": "1", "docName": "test.md", "excerpt": "test content"},
+            ],
+        }
+        self.mock_client.get_chunks.return_value = {"records": [{"id": "789"}]}
 
         search_experience_impl(query="test")
 
