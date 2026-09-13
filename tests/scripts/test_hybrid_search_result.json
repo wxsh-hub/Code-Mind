@@ -1,0 +1,22 @@
+{
+  "auto_detection": {
+    "passed": 5,
+    "failed": 0
+  },
+  "like_search": {
+    "passed": 5,
+    "failed": 0
+  },
+  "vector_search": {
+    "passed": 5,
+    "failed": 0
+  },
+  "hybrid_search": {
+    "passed": 4,
+    "failed": 0
+  },
+  "total": {
+    "passed": 19,
+    "failed": 0
+  }
+}

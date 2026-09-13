@@ -328,7 +328,7 @@ rocketmq:
   name-server: 127.0.0.1:9876
   producer:
     group: ragent-producer${unique-name:}_pg
-    send-message-timeout: 2000
+    send-message-timeout: 10000
 
 milvus:
   uri: http://localhost:19530

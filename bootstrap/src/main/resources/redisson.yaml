@@ -1,0 +1,4 @@
+singleServerConfig:
+  address: "redis://127.0.0.1:6380"
+  password: "123456"
+  database: 0

@@ -13,10 +13,12 @@ metadata:
 
 ## 项目在哪里
 
-| 项目 | 路径 | 语言 |
+| 模块 | 路径 | 语言 |
 |------|------|------|
-| ragent | D:\11111111111\AAAworkAAA\ragent | Java 17 |
-| mcp-gateway | D:\11111111111\AAAworkAAA\mcp-gateway | Python 3.10+ |
+| ragent (后端) | D:\11111111111\AAAworkAAA\ragent | Java 17 |
+| mcp_gateway (MCP网关) | D:\11111111111\AAAworkAAA\ragent\mcp_gateway | Python 3.10+ |
+| frontend (前端) | D:\11111111111\AAAworkAAA\ragent\frontend | React 18 |
+| tests (测试) | D:\11111111111\AAAworkAAA\ragent\tests | Python |
 
 ## 第一步：读记忆
 
@@ -48,29 +50,35 @@ PostgreSQL + pgvector
 
 ## 第三步：运行测试
 
-### MCP Gateway 测试
+### 单元测试（172 个）
 ```bash
-cd D:\11111111111\AAAworkAAA\mcp-gateway
-python -m pytest tests/ -v
+cd D:\11111111111\AAAworkAAA\ragent
+python -m pytest tests/test_memory_tools.py tests/test_conflict_review.py tests/test_rag_tools.py -v
 ```
 
-### 集成测试
+### 混合检索测试（19 个）
 ```bash
-cd D:\11111111111\AAAworkAAA\mcp-gateway
-bash test_final.sh
+cd D:\11111111111\AAAworkAAA\ragent
+python tests/scripts/test_hybrid_search.py
+```
+
+### Playwright 前端测试
+```bash
+cd D:\11111111111\AAAworkAAA\ragent\frontend
+python tests/scripts/test_frontend_simple.py
 ```
 
 ## 第四步：了解 MCP 工具
 
-使用 `list_mcp_tools` 查看所有可用工具（28 个）。
+使用 `list_mcp_tools` 查看所有可用工具（30+ 个）。
 
 主要工具：
+- **知识检索**：search_experience（向量检索 + AI 回答）
+- **记忆管理**：upload_memory, ask_project, batch_upload_memories, batch_delete_memories
 - **模块管理**：create_module, list_modules, delete_module
 - **功能管理**：create_feature, list_features, delete_feature
-- **记忆管理**：upload_memory, ask_project, delete_memory
-- **技能管理**：upload_skill, search_skill, delete_skill
-- **向量管理**：delete_vector, delete_vectors
-- **矛盾审核**：list_conflicts, review_conflict
+- **矛盾审核**：submit_conflict_for_review, list_conflicts, review_conflict
+- **向量管理**：deprecate_chunk, batch_deprecate_chunks
 
 ## 第五步：开始开发
 
@@ -105,7 +113,16 @@ test: 测试相关
 
 ## 常见任务
 
-### 查询知识
+### 查询知识（推荐：向量检索 + AI 回答）
+```python
+result = search_experience(
+    query="如何实现分页",
+    top_k=5
+)
+# 返回: ai_answer, results, deprecated_chunks
+```
+
+### 查询知识（逐级降级检索）
 ```python
 result = ask_project(
     project="Code-Mind",
@@ -113,6 +130,7 @@ result = ask_project(
     feature_codes=["2437"],
     module="user"
 )
+# 检索顺序: 功能级 → 模块级 → 全库 → 向量
 ```
 
 ### 上传知识
@@ -126,13 +144,25 @@ upload_memory(
 )
 ```
 
-### 删除错误向量
+### 批量上传
 ```python
-delete_vector(
+batch_upload_memories(
     project="Code-Mind",
-    chunk_id="错误向量ID",
-    find_similar=True
+    files=[
+        {"filename": "doc1.md", "content": "..."},
+        {"filename": "doc2.md", "content": "..."},
+    ],
+    feature_codes=["2437"],
+    module="user"
 )
+```
+
+### 删除过时向量
+```python
+deprecate_chunk(chunk_id="过时向量ID")
+
+# 批量删除
+batch_deprecate_chunks(chunk_ids=["id1", "id2", "id3"])
 ```
 
 ## 注意事项
