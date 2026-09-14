@@ -259,6 +259,13 @@ public class GlobalExceptionHandler {
         String className = cause.getClass().getSimpleName();
         String message = cause.getMessage();
 
+        // 模型侧异常优先：其类名来自 AgentScope / OpenAI SDK，命名五花八门，
+        // 且原始 message 会带上供应商名、HTTP 状态与响应体，直接透给用户既难懂又暴露内部细节
+        String modelFriendly = extractModelFriendlyMessage(throwable, cause);
+        if (modelFriendly != null) {
+            return modelFriendly;
+        }
+
         // 根据异常类型返回友好信息
         if (className.contains("NullPointer")) {
             return "数据处理异常，请检查输入参数";
@@ -282,6 +289,52 @@ public class GlobalExceptionHandler {
         }
 
         return "系统执行出错: " + className;
+    }
+
+    /**
+     * 识别模型调用失败并给出面向用户的提示，认不出则返回 null 交给通用分支
+     * <p>
+     * 沿异常链自上而下找第一个匹配项，而非只看根因：AgentScope 会把供应商异常
+     * 包进自己的类型，根因有时是 IOException 这类泛化异常，靠它判不出是鉴权还是限流。
+     * 真正的判据是链上任何一层类名带 Authentication/Credits/RateLimit 这类语义
+     * <p>
+     * 只回固定文案，不透传原始 message：后者含供应商域名、HTTP 状态码与响应体，
+     * 既让用户看不懂，也把内部集成细节暴露给了外部
+     */
+    private String extractModelFriendlyMessage(Throwable throwable, Throwable rootCause) {
+        for (Throwable current = throwable; current != null; current = current.getCause()) {
+            String name = current.getClass().getSimpleName();
+            if (name.contains("Authentication")
+                    || name.contains("Unauthorized")
+                    || name.contains("ApiKey")
+                    || name.contains("PermissionDenied")) {
+                return "AI 服务鉴权失败，请联系管理员检查模型 API Key 配置";
+            }
+            if (name.contains("InsufficientBalance") || name.contains("Credits")) {
+                return "AI 服务额度不足，请联系管理员充值";
+            }
+            if (name.contains("RateLimit") || name.contains("Throttl")) {
+                return "AI 服务请求过于频繁，请稍后重试";
+            }
+            if (name.contains("Timeout")) {
+                return "AI 服务响应超时，请稍后重试";
+            }
+            if (current == rootCause) {
+                break;
+            }
+        }
+
+        // 类名认不出，再用原始 message 嗅探供应商返回的错误码（如 SiliconFlow 的 30014）
+        String rootMessage = rootCause == null ? null : rootCause.getMessage();
+        if (rootMessage != null) {
+            if (rootMessage.contains("Token is invalid") || rootMessage.contains("invalid_api_key")) {
+                return "AI 服务鉴权失败，请联系管理员检查模型 API Key 配置";
+            }
+            if (rootMessage.contains("insufficient") && rootMessage.contains("balance")) {
+                return "AI 服务额度不足，请联系管理员充值";
+            }
+        }
+        return null;
     }
 
     private String getUrl(HttpServletRequest request) {
