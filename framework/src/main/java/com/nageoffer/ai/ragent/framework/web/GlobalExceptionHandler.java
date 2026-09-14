@@ -24,7 +24,9 @@ import cn.hutool.core.util.StrUtil;
 import com.nageoffer.ai.ragent.framework.convention.Result;
 import com.nageoffer.ai.ragent.framework.errorcode.BaseErrorCode;
 import com.nageoffer.ai.ragent.framework.exception.AbstractException;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tomcat.util.http.fileupload.impl.FileSizeLimitExceededException;
@@ -35,9 +37,11 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -110,22 +114,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(value = NotLoginException.class)
     public Object notLoginException(HttpServletRequest request, NotLoginException ex,
-                                     jakarta.servlet.http.HttpServletResponse response) {
+                                     HttpServletResponse response) {
         log.warn("[{}] {} [auth] not-login: {}", request.getMethod(), getUrl(request), ex.getMessage());
-
-        // 如果是 SSE 请求，返回 SSE 格式的错误
-        String accept = request.getHeader("Accept");
-        if (accept != null && accept.contains("text/event-stream")) {
-            response.setContentType("text/event-stream;charset=UTF-8");
-            response.setStatus(401);
-            try {
-                response.getWriter().write("event: error\ndata: {\"error\": \"未登录或登录已过期\"}\n\n");
-                response.getWriter().flush();
-            } catch (Exception ignored) {
-            }
-            return null;
+        if (isEventStream(request, response)) {
+            return writeSseError(response, 401, "未登录或登录已过期");
         }
-
         return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), "未登录或登录已过期");
     }
 
@@ -159,27 +152,94 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(value = Throwable.class)
     public Object defaultErrorHandler(HttpServletRequest request, Throwable throwable,
-                                       jakarta.servlet.http.HttpServletResponse response) {
+                                       HttpServletResponse response) {
         log.error("[{}] {} ", request.getMethod(), getUrl(request), throwable);
 
         // 提取更有用的错误信息
         String message = extractFriendlyMessage(throwable);
 
-        // 如果是 SSE 请求，返回 SSE 格式的错误
-        String accept = request.getHeader("Accept");
-        if (accept != null && accept.contains("text/event-stream")) {
-            response.setContentType("text/event-stream;charset=UTF-8");
-            response.setStatus(500);
-            try {
-                String errorJson = "{\"error\": \"" + message.replace("\"", "\\\"") + "\"}";
-                response.getWriter().write("event: error\ndata: " + errorJson + "\n\n");
-                response.getWriter().flush();
-            } catch (Exception ignored) {
-            }
-            return null;
+        if (isEventStream(request, response)) {
+            // SSE 流已经开始推送（meta 事件先于模型调用发出），此处必须以 SSE 事件收尾：
+            // 回退成 JSON 会撞上已锁定的 text/event-stream Content-Type，触发
+            // HttpMessageNotWritableException，错误信息反而送不到前端
+            return writeSseError(response, 500, message);
         }
 
         return Results.failure(BaseErrorCode.SERVICE_ERROR.code(), message);
+    }
+
+    /**
+     * 客户端断连：SSE 流在推送途中对端已关闭，响应不可再用
+     * <p>
+     * 单独拦截而非落进 {@link #defaultErrorHandler}，是因为这属于正常的用户行为
+     * （关页面、切路由），不是服务端故障，记 error 会污染日志、也不该尝试写入任何响应
+     */
+    @ExceptionHandler(value = AsyncRequestNotUsableException.class)
+    public void clientDisconnected(HttpServletRequest request, AsyncRequestNotUsableException ex) {
+        log.debug("[{}] {} 客户端已断开，放弃本次响应: {}",
+                request.getMethod(), getUrl(request), ex.getMessage());
+    }
+
+    /**
+     * 判定本次响应是否应按 SSE 事件格式收尾
+     * <p>
+     * 以响应侧 Content-Type 为主：SSE 接口的 {@code produces} 会让容器在流开始推送时就锁定该类型，
+     * 它比请求头的 Accept 更能反映「此刻正在以什么协议说话」。仅当响应尚未定型时，
+     * 才回退看 Accept（例如未登录在控制器之前就被拦下，此时响应还没建立）
+     */
+    private boolean isEventStream(HttpServletRequest request, HttpServletResponse response) {
+        String contentType = response.getContentType();
+        if (contentType != null && contentType.contains("text/event-stream")) {
+            return true;
+        }
+        if (response.isCommitted()) {
+            // 响应已提交却拿不到 SSE 类型，说明在此之前已有内容写出，无法再改协议
+            return false;
+        }
+        String accept = request.getHeader("Accept");
+        return accept != null && accept.contains("text/event-stream");
+    }
+
+    /**
+     * 以 SSE 事件格式写出错误并结束响应
+     * <p>
+     * 走 OutputStream 而非 Writer：SseEmitter 全程用 {@code getOutputStream()} 推送，
+     * 二者互斥，此处再用 {@code getWriter()} 会直接抛 "getOutputStream() has already been called"
+     *
+     * @return 恒为 null，供 {@code @ExceptionHandler} 直接返回，表示响应已由本方法接管
+     */
+    private Object writeSseError(HttpServletResponse response, int status, String message) {
+        if (response.isCommitted()) {
+            // 响应头已发出，状态码改不动了，但事件体仍可追加，前端至少能拿到错误
+            log.warn("[SSE] 响应已提交，仅追加 error 事件，status={} 不再生效", status);
+        } else {
+            response.setContentType("text/event-stream;charset=UTF-8");
+            response.setStatus(status);
+        }
+        try {
+            String payload = "{\"error\": \"" + escapeJson(message) + "\"}";
+            byte[] frame = ("event: error\ndata: " + payload + "\n\n")
+                    .getBytes(StandardCharsets.UTF_8);
+            ServletOutputStream out = response.getOutputStream();
+            out.write(frame);
+            out.flush();
+        } catch (Exception writeFailure) {
+            log.warn("[SSE] error 事件写出失败，前端将只能看到流中断: {}", writeFailure.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * 转义 JSON 字符串值：反斜杠与双引号必须转义，换行会让 data 行断成两行、破开 SSE 帧
+     */
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\r", " ")
+                .replace("\n", " ");
     }
 
     /**
