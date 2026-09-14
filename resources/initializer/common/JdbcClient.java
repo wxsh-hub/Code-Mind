@@ -95,6 +95,36 @@ final class JdbcClient implements AutoCloseable {
         return "'" + value.replace("'", "''") + "'";
     }
 
+    /**
+     * 单事务执行多条写语句，任一失败整体回滚
+     * <p>
+     * 供按行改写的修复类工具使用：语句由调用方逐条构造，参数拼装须自经 {@link #literal} 转义
+     */
+    void executeBatch(List<String> statements) throws SQLException, IOException {
+        if (statements.isEmpty()) {
+            return;
+        }
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                for (String sql : statements) {
+                    try (Statement statement = connection.createStatement()) {
+                        statement.setQueryTimeout(config.getInt("database.statement-timeout-seconds", 120));
+                        statement.execute(sql);
+                    }
+                }
+                connection.commit();
+            } catch (SQLException | RuntimeException ex) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackFailure) {
+                    ex.addSuppressed(rollbackFailure);
+                }
+                throw ex;
+            }
+        }
+    }
+
     void executeScript(Path file) throws IOException, SQLException {
         if (!Files.isRegularFile(file)) {
             throw new IllegalArgumentException("SQL 文件不存在: " + file.toAbsolutePath());

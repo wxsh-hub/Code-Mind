@@ -79,6 +79,35 @@ class SensitiveDataFilterTest {
     }
 
     @Test
+    void 含at符号的密码被完整替换() {
+        // 密码含 @ 时，贪婪匹配须回溯到最后一个 @，否则只脱敏前半段
+        String input = "mysql://root:MyS3cretP@ssw0rd!@db.internal.com:3306/prod";
+        String result = SensitiveDataFilter.filter(input);
+        assertFalse(result.contains("ssw0rd!"), "密码后半段不得残留");
+        assertFalse(result.contains("MyS3cretP"), "密码前半段不得残留");
+        assertFalse(result.contains("P@ssw0rd"), "密码中段不得残留");
+        assertTrue(result.contains("<MASKED_PWD>"), "应替换为占位符");
+        assertTrue(result.contains("@db.internal.com:3306/prod"), "主机与库名须保留");
+    }
+
+    @Test
+    void 多at符号的连接串被完整替换() {
+        String input = "postgresql://admin:a@b@c@host:5432/mydb";
+        String result = SensitiveDataFilter.filter(input);
+        assertFalse(result.contains("a@b@c"), "多 @ 密码不得残留");
+        assertTrue(result.contains("<MASKED_PWD>"));
+        assertTrue(result.contains("@host:5432/mydb"), "主机须保留");
+    }
+
+    @Test
+    void 无at符号的连接串密码被替换() {
+        String input = "mysql://root:simplepass@host/db";
+        String result = SensitiveDataFilter.filter(input);
+        assertFalse(result.contains("simplepass"), "普通密码应被替换");
+        assertTrue(result.contains("<MASKED_PWD>"));
+    }
+
+    @Test
     void password行被替换() {
         String input = "password=SuperSecret123\ndb_host=localhost";
         String result = SensitiveDataFilter.filter(input);
@@ -88,11 +117,26 @@ class SensitiveDataFilterTest {
 
     @Test
     void 中文密码关键词被替换() {
-        String input = "密码: abc123456";
-        // 当前规则基于英文 password/passwd/pwd，中文暂不处理（避免误杀）
+        // 企业中文文档写「密码: xxx」比写 password= 更常见，须一并覆盖
+        String input = "密码: MyS3cretP@ssw0rd!";
         String result = SensitiveDataFilter.filter(input);
-        // 中文"密码"不在规则中，不应误杀普通文本
-        assertTrue(result.contains("密码"), "中文密码关键词暂不过滤，避免误杀");
+        assertFalse(result.contains("MyS3cretP"), "中文密码字段应被替换");
+        assertTrue(result.contains("<MASKED_PWD>"));
+    }
+
+    @Test
+    void 中文全角冒号密码被替换() {
+        String input = "口令：abc123456";
+        String result = SensitiveDataFilter.filter(input);
+        assertFalse(result.contains("abc123456"), "全角冒号应被识别");
+        assertTrue(result.contains("<MASKED_PWD>"));
+    }
+
+    @Test
+    void 中文密码无分隔符不误杀() {
+        // 「密码策略」「忘记密码」不含 = : ：，不应命中
+        assertEquals("密码策略说明", SensitiveDataFilter.filter("密码策略说明"));
+        assertEquals("忘记密码请联系管理员", SensitiveDataFilter.filter("忘记密码请联系管理员"));
     }
 
     // ========== PII ==========

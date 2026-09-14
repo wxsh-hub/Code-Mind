@@ -65,9 +65,14 @@ public final class SensitiveDataFilter {
 
         // ---- 连接串中的密码 ----
         // mysql://user:password@host  /  postgresql://...  /  mongodb://...
-        rule("(\\w+://[^:]+:)([^@]{3,})(@[^\\s]+)", "$1<MASKED_PWD>$3");
-        // password=xxx / passwd=xxx / pwd=xxx (行内)
-        rule("(?i)(password|passwd|pwd)\\s*[=:]\\s*\\S+", "$1=<MASKED_PWD>");
+        // 密码段用贪婪 .{3,} 而非 [^@]{3,}：密码本身可能含 @（如 P@ssw0rd），
+        // 排除 @ 会在第一个 @ 处截断，只脱敏前半段、后半段明文泄漏
+        rule("(\\w+://[^:]+:)(.{3,})(@[^\\s]+)", "$1<MASKED_PWD>$3");
+        // 凭据关键词后的取值：password=x / 密码: x / 口令：x
+        // 中英文一并覆盖——企业中文文档写「密码: xxx」比写 password= 更常见，
+        // 只认紧跟 = : ： 的形式，「密码策略」「忘记密码」这类无分隔符的不会命中；
+        // 取值用 \S+ 止于空白，故「密码: 见附件」这类指路型写法也会被吃掉，属可接受的误杀
+        rule("(?i)(password|passwd|pwd|密码|口令|密钥|令牌)\\s*[=:：]\\s*\\S+", "$1=<MASKED_PWD>");
 
         // ---- PII ----
         // 中国大陆手机号 (1[3-9]X XXXX XXXX) — 前后不能有数字，避免匹配长数字串
