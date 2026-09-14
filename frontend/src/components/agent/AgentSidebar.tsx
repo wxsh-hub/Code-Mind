@@ -28,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { resolveAvatarUrl } from "@/lib/avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { useAgentChatStore } from "@/stores/agentChatStore";
 import type { AgentSession } from "@/types/agent";
@@ -164,8 +165,9 @@ export function AgentSidebar() {
 
   const username = user?.username || user?.userId || "用户";
   const displayName = /^\d+$/.test(username) ? "用户" : username;
-  const avatarUrl = user?.avatar?.trim();
-  const showAvatar = Boolean(avatarUrl) && !avatarFailed;
+  const avatarUrl = resolveAvatarUrl(user?.avatar);
+  // 未配置头像时已在 resolveAvatarUrl 里回落默认图，此处只在图片真的加载失败时才退到首字母
+  const showAvatar = !avatarFailed;
   const keyword = query.trim().toLowerCase();
   const shown = keyword
     ? sessions.filter((session) => (session.title || "新会话").toLowerCase().includes(keyword))
