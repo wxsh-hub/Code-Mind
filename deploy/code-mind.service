@@ -1,0 +1,28 @@
+[Unit]
+Description=Code-Mind Ragent Service
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/code-mind/app
+
+# 显式限制堆：服务器共 3.6G 内存，需与容器内的 RocketMQ/PG 共享，
+# 不限制则 JVM 默认按物理内存 1/4 取值（实测 914M），会挤占其他进程
+# 必须加引号：systemd 的 Environment= 会把空格当多个 VAR=value 的分隔符，
+# 不加引号只生效第一个，-Xmx512m 会被当成非法变量名静默丢弃
+Environment="JAVA_OPTS=-Xms256m -Xmx512m -XX:+UseG1GC"
+
+ExecStart=/usr/bin/java $JAVA_OPTS \
+  -jar /opt/code-mind/app/bootstrap-0.0.1-SNAPSHOT.jar \
+  --spring.profiles.active=server \
+  --spring.config.additional-location=file:/opt/code-mind/app/
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/opt/code-mind/logs/stdout.log
+StandardError=append:/opt/code-mind/logs/stderr.log
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

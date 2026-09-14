@@ -197,6 +197,8 @@ CREATE TABLE t_knowledge_document (
     schedule_cron    VARCHAR(64),
     ingestion_spec   JSONB,
     pipeline_id      VARCHAR(20),
+    feature_codes    VARCHAR(256),
+    module           VARCHAR(128),
     created_by       VARCHAR(20)   NOT NULL,
     updated_by       VARCHAR(20),
     create_time      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -205,6 +207,8 @@ CREATE TABLE t_knowledge_document (
 );
 CREATE INDEX idx_kb_id ON t_knowledge_document (kb_id);
 COMMENT ON TABLE t_knowledge_document IS '知识库文档表';
+COMMENT ON COLUMN t_knowledge_document.feature_codes IS '关联的功能编号，逗号分隔，如 2437,2438';
+COMMENT ON COLUMN t_knowledge_document.module IS '所属模块名称';
 
 CREATE TABLE t_knowledge_chunk (
     id             VARCHAR(20)      NOT NULL PRIMARY KEY,
@@ -646,7 +650,10 @@ CREATE TABLE t_knowledge_vector (
     collection_name VARCHAR(64) NOT NULL,
     content         TEXT,
     metadata        JSONB,
-    embedding       vector(1536)
+    embedding       vector(1536),
+    confidence      INT         DEFAULT 1,
+    upload_count    INT         DEFAULT 1,
+    last_upload_at  TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_kv_collection_name ON t_knowledge_vector (collection_name);
@@ -654,6 +661,9 @@ CREATE INDEX idx_kv_metadata ON t_knowledge_vector USING gin(metadata);
 CREATE INDEX idx_kv_embedding ON t_knowledge_vector USING hnsw (embedding vector_cosine_ops);
 COMMENT ON TABLE t_knowledge_vector IS '知识库向量存储表';
 COMMENT ON COLUMN t_knowledge_vector.id IS '分块ID';
+COMMENT ON COLUMN t_knowledge_vector.confidence IS '置信度分数（相似向量提交次数）';
+COMMENT ON COLUMN t_knowledge_vector.upload_count IS '上传次数';
+COMMENT ON COLUMN t_knowledge_vector.last_upload_at IS '最后上传时间';
 COMMENT ON COLUMN t_knowledge_vector.collection_name IS '知识库Collection';
 COMMENT ON COLUMN t_knowledge_vector.content IS '分块文本内容';
 COMMENT ON COLUMN t_knowledge_vector.metadata IS '元数据';

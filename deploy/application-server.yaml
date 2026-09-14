@@ -1,0 +1,22 @@
+# Code-Mind 生产部署配置（服务器 profile）
+# 与本地 application-local.yaml 的差异：复用宿主机已有的 Redis 与 MinIO，不启 RustFS
+
+ai:
+  providers:
+    bailian:
+      api-key: ${BAILIAN_API_KEY:sk-ws-H.EXPDYEI.sfY0.MEQCIDyGErO8lms3-TP2Xhq4iboQbSl6SQCUJUtYBfgkj0KMAiBVoz2H6SCm2FARBt0Cs12dNDZBxWkaij6UgogBsUyXCA}
+      url: https://dashscope.aliyuncs.com
+      endpoints:
+        chat: /compatible-mode/v1/chat/completions
+        embedding: /compatible-mode/v1/embeddings
+    siliconflow:
+      api-key: ${SILICONFLOW_API_KEY:sk-gfusuvfnhxuwrxoemwoinojyjmbdbligrggbahubwylrxyda}
+
+# 服务器上未部署 MCP Gateway，置空避免启动期反复重连与报错
+rag:
+  mcp:
+    servers: []
+
+logging:
+  file:
+    name: /opt/code-mind/logs/ragent.log

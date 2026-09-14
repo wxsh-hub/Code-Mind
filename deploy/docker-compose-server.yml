@@ -1,0 +1,48 @@
+# Code-Mind 服务器部署：只起 PostgreSQL 与 RocketMQ
+# Redis 与 MinIO 复用宿主机已有实例，故不在此定义，避免端口冲突
+services:
+  postgres:
+    container_name: cm-postgres
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ragent
+    ports:
+      - "5432:5432"
+    volumes:
+      - cm-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  namesrv:
+    container_name: cm-rocketmq-namesrv
+    image: apache/rocketmq:5.2.0
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
+    restart: unless-stopped
+
+  broker:
+    container_name: cm-rocketmq-broker
+    image: apache/rocketmq:5.2.0
+    command: sh mqbroker -n namesrv:9876 -c /tmp/broker.properties
+    ports:
+      - "10911:10911"
+      - "10909:10909"
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx512m"
+    volumes:
+      - ./broker.properties:/tmp/broker.properties
+    depends_on:
+      - namesrv
+    restart: unless-stopped
+
+volumes:
+  cm-pg-data:

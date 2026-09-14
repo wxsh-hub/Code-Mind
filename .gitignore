@@ -83,5 +83,11 @@ env/
 # 本地配置文件（包含敏感信息）
 bootstrap/src/main/resources/application-local.yaml
 
+# SSH 私钥，任何情况下都不得入库
+*.pem
+*.key
+id_rsa
+id_ed25519
+
 # 本地素材原件，成品已放 frontend/public/
 默认头像.png
