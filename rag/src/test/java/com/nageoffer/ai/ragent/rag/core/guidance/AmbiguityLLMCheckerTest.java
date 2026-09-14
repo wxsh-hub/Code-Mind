@@ -25,7 +25,6 @@ import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import com.nageoffer.ai.ragent.rag.core.prompt.PromptTemplateLoader;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.core.io.DefaultResourceLoader;
 
 import java.util.List;
 
@@ -40,7 +39,7 @@ class AmbiguityLLMCheckerTest {
 
     private final LLMService llmService = mock(LLMService.class);
     private final AmbiguityLLMChecker checker = new AmbiguityLLMChecker(
-            llmService, new PromptTemplateLoader(new DefaultResourceLoader()));
+            llmService, new PromptTemplateLoader());
 
     @Test
     void returnsTrueWhenLlmReportsAmbiguous() {

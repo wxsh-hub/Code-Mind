@@ -446,7 +446,11 @@ public final class FairDistributedRateLimiter {
 
     private static String loadLuaScript() {
         try {
-            ClassPathResource resource = new ClassPathResource(LUA_PATH);
+            // 显式指定类加载器：单参构造走线程上下文类加载器（TCCL），
+            // 而本类可能被 Reactor 等异步线程构造，其 TCCL 是 AppClassLoader，
+            // 看不到 fat jar 内 BOOT-INF/lib 下的资源
+            ClassPathResource resource = new ClassPathResource(LUA_PATH,
+                    FairDistributedRateLimiter.class.getClassLoader());
             return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
         } catch (Exception ex) {
             throw new IllegalStateException("加载 Lua 脚本失败：" + LUA_PATH, ex);

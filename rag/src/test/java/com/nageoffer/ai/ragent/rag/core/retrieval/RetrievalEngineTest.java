@@ -30,7 +30,6 @@ import com.nageoffer.ai.ragent.rag.core.prompt.PromptTemplateLoader;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalContext;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.DefaultResourceLoader;
 
 import java.util.List;
 import java.util.Map;
@@ -101,7 +100,7 @@ class RetrievalEngineTest {
                 any(SubQuestionIntent.class), any(RetrievalBudget.class)))
                 .thenReturn(new KnowledgeRetrievalResult(List.of(globalChunk), Map.of(), Set.of()));
         ContextFormatter contextFormatter = new DefaultContextFormatter(
-                new PromptTemplateLoader(new DefaultResourceLoader()));
+                new PromptTemplateLoader());
 
         RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
                 new SubQuestionIntent("问题", List.of(

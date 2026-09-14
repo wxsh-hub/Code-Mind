@@ -21,7 +21,6 @@ import com.nageoffer.ai.ragent.rag.config.RAGConfigProperties;
 import com.nageoffer.ai.ragent.rag.core.intent.IntentNode;
 import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.DefaultResourceLoader;
 
 import java.util.List;
 import java.util.Set;
@@ -47,7 +46,7 @@ class RAGPromptServiceTest {
         AgentPromptResolver resolver = mock(AgentPromptResolver.class);
         when(resolver.resolve(any())).thenReturn(STUB_BASE_TEMPLATE);
 
-        return new RAGPromptService(new PromptTemplateLoader(new DefaultResourceLoader()), resolver, properties);
+        return new RAGPromptService(new PromptTemplateLoader(), resolver, properties);
     }
 
     private static PromptContext kbContext() {

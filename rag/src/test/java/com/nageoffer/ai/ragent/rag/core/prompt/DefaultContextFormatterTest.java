@@ -21,7 +21,6 @@ import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.rag.core.intent.IntentNode;
 import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.DefaultResourceLoader;
 
 import java.util.List;
 import java.util.Set;
@@ -40,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DefaultContextFormatterTest {
 
     private DefaultContextFormatter formatter() {
-        return new DefaultContextFormatter(new PromptTemplateLoader(new DefaultResourceLoader()));
+        return new DefaultContextFormatter(new PromptTemplateLoader());
     }
 
     private RetrievedChunk chunk(String id, String text, String docId, String docName, Integer index, float score) {

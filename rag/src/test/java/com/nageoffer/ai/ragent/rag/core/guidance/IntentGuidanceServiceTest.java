@@ -24,7 +24,6 @@ import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import com.nageoffer.ai.ragent.rag.core.prompt.PromptTemplateLoader;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.DefaultResourceLoader;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -51,7 +50,7 @@ class IntentGuidanceServiceTest {
     private final CountingRegistry registry = new CountingRegistry();
     private final AmbiguityLLMChecker checker = mock(AmbiguityLLMChecker.class);
     private final IntentGuidanceService service = new IntentGuidanceService(
-            properties, registry, new PromptTemplateLoader(new DefaultResourceLoader()), checker);
+            properties, registry, new PromptTemplateLoader(), checker);
 
     @Test
     void callsLlmWhenTwoCandidatesShareLeafNameUnderSameAncestor() {

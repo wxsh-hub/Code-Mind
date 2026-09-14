@@ -18,10 +18,9 @@
 package com.nageoffer.ai.ragent.rag.core.prompt;
 
 import cn.hutool.core.util.StrUtil;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -36,10 +35,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PromptTemplateLoader {
 
-    private final ResourceLoader resourceLoader;
+    private static final String CLASSPATH_PREFIX = "classpath:";
+
     private final Map<String, String> cache = new ConcurrentHashMap<>();
     private final Map<String, Map<String, String>> sectionCache = new ConcurrentHashMap<>();
 
@@ -107,14 +106,22 @@ public class PromptTemplateLoader {
 
     /**
      * 从资源路径读取模板内容
+     * <p>
+     * 显式用本类的类加载器，不走 {@code ResourceLoader} 的默认实现：后者取线程上下文类加载器
+     * （TCCL），而 Agent 工具跑在 Reactor 的 boundedElastic 线程上，其 TCCL 是 AppClassLoader，
+     * 看不到 fat jar 内 {@code BOOT-INF/lib/rag.jar} 里的资源——同一条 prompt 在 Tomcat 线程上
+     * 能加载、在 Agent 工具里就报「路径不存在」，根因就在这里
      *
-     * @param path 模板文件路径
+     * @param path 模板文件路径，可带 classpath: 前缀
      * @return 模板内容字符串
      * @throws IllegalStateException 当模板文件不存在或读取失败时抛出
      */
     private String readResource(String path) {
-        String location = path.startsWith("classpath:") ? path : "classpath:" + path;
-        Resource resource = resourceLoader.getResource(location);
+        String resourcePath = path.startsWith(CLASSPATH_PREFIX)
+                ? path.substring(CLASSPATH_PREFIX.length())
+                : path;
+        Resource resource = new ClassPathResource(resourcePath,
+                PromptTemplateLoader.class.getClassLoader());
         if (!resource.exists()) {
             throw new IllegalStateException("提示词模板路径不存在：" + path);
         }
