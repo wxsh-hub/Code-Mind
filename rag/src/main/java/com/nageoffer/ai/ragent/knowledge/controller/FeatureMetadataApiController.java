@@ -92,7 +92,7 @@ public class FeatureMetadataApiController {
             wrapper.eq(FeatureMetadataDO::getModuleName, module);
         }
 
-        wrapper.orderByDesc(FeatureMetadataDO::getCreatedAt);
+        wrapper.orderByDesc(FeatureMetadataDO::getCreateTime);
         return Results.success(featureMapper.selectList(wrapper));
     }
 
@@ -158,7 +158,7 @@ public class FeatureMetadataApiController {
         result.put("moduleName", feature.getModuleName());
         result.put("description", feature.getDescription());
         result.put("status", feature.getStatus());
-        result.put("createdAt", feature.getCreatedAt());
+        result.put("createdAt", feature.getCreateTime());
         return Results.success(result);
     }
 

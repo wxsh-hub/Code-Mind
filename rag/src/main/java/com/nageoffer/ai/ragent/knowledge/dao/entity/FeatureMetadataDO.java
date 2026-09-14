@@ -77,13 +77,13 @@ public class FeatureMetadataDO {
      * 创建时间
      */
     @TableField(fill = FieldFill.INSERT)
-    private Date createdAt;
+    private Date createTime;
 
     /**
      * 更新时间
      */
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private Date updatedAt;
+    private Date updateTime;
 
     /**
      * 是否删除 0：正常 1：删除

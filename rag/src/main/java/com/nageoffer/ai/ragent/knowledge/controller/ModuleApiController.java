@@ -79,7 +79,7 @@ public class ModuleApiController {
     public Result<List<ModuleDO>> listModules() {
         LambdaQueryWrapper<ModuleDO> wrapper = new LambdaQueryWrapper<ModuleDO>()
                 .eq(ModuleDO::getDeleted, 0)
-                .orderByDesc(ModuleDO::getCreatedAt);
+                .orderByDesc(ModuleDO::getCreateTime);
         return Results.success(moduleMapper.selectList(wrapper));
     }
 
@@ -102,7 +102,7 @@ public class ModuleApiController {
         result.put("id", module.getId());
         result.put("name", module.getName());
         result.put("description", module.getDescription());
-        result.put("createdAt", module.getCreatedAt());
+        result.put("createdAt", module.getCreateTime());
         return Results.success(result);
     }
 
