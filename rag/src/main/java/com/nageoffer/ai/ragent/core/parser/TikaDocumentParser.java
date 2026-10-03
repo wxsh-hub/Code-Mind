@@ -17,19 +17,22 @@
 
 package com.nageoffer.ai.ragent.core.parser;
 
+import cn.hutool.core.util.StrUtil;
+import com.nageoffer.ai.ragent.core.parser.mineru.MinerUProperties;
 import com.nageoffer.ai.ragent.core.parser.model.Block;
 import com.nageoffer.ai.ragent.core.parser.model.ParagraphBlock;
 import com.nageoffer.ai.ragent.core.parser.model.ParsedDocument;
 import com.nageoffer.ai.ragent.core.parser.model.Provenance;
 import com.nageoffer.ai.ragent.core.parser.registry.ParseProfile;
 import com.nageoffer.ai.ragent.framework.exception.ServiceException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
-import org.apache.tika.parser.pdf.PDFParserConfig;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,15 +46,18 @@ import java.util.Set;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class TikaDocumentParser implements DocumentParser {
 
     private static final Tika TIKA = new Tika();
 
-    static {
-        PDFParserConfig pdfConfig = new PDFParserConfig();
-        pdfConfig.setExtractInlineImages(false);
-        pdfConfig.setExtractUniqueInlineImagesOnly(true);
-    }
+    /**
+     * 判断 MinerU 是否在位：在位则由它认领富文档，本解析器只做纯文本长尾
+     */
+    private final MinerUProperties minerUProperties;
+
+    // 此处原有 static 块 new 了一个 PDFParserConfig 设置内联图片开关，但既没挂到 TIKA 上
+    // （TIKA.parseToString 用不到它），设的还是 Tika 的默认值，等于两重空操作，已删
 
     @Override
     public String getParserType() {
@@ -99,10 +105,14 @@ public class TikaDocumentParser implements DocumentParser {
     /**
      * 精确键覆盖已声明支持的格式，{@code text/*} 通配只兜未声明的长尾；刻意不认领 image 与未知 MIME，
      * 认不出来就报错，不要兜底产出垃圾文本
+     * <p>
+     * 富文档（PDF / Word / PPT）平时由 MinerU 精确认领，本解析器只在**未配置 MinerU**时补认领——
+     * 注册表对同一键的两个认领者直接判定冲突并拒绝启动，所以两边必须互斥：
+     * 有 key 时 MinerU 认领（有版面分析），无 key 时 Tika 认领（纯文本，但可用）
      */
     @Override
     public Map<ParseProfile, Set<String>> supportedMimeTypes() {
-        return Map.of(ParseProfile.FAST, Set.of(
+        Set<String> mimes = new HashSet<>(Set.of(
                 "text/*",
                 "text/html",
                 "application/json",
@@ -110,5 +120,36 @@ public class TikaDocumentParser implements DocumentParser {
                 "application/xhtml+xml",
                 "application/rtf"
         ));
+        mimes.addAll(PDF_MIME_TYPES);
+        if (StrUtil.isBlank(minerUProperties.getApiKey())) {
+            mimes.addAll(WORD_AND_SLIDE_MIME_TYPES);
+        }
+        return Map.of(ParseProfile.FAST, Set.copyOf(mimes));
     }
+
+    /**
+     * 恒定由 Tika 解析的 PDF
+     * <p>
+     * MinerU 的 PDF 通道实测卡死（批任务长期 pending），已把 PDF 从它的认领清单摘掉，
+     * 这里就固定接住——不再受 MinerU 是否配置影响，否则配了 key 反而没人认领 PDF、启动自检直接失败。
+     * 代价是版面分析能力：表格退化为文本行、公式丢失、扫描件抽不出内容
+     */
+    private static final Set<String> PDF_MIME_TYPES = Set.of(
+            "application/pdf",
+            "application/x-pdf"
+    );
+
+    /**
+     * MinerU 缺席时由 Tika 代管的 Word / PPT
+     * <p>
+     * MinerU 在位时这几个格式归它（版面还原明显更好，且实测正常），只有没配 key 才落到这里
+     */
+    private static final Set<String> WORD_AND_SLIDE_MIME_TYPES = Set.of(
+            "application/msword",
+            "application/vnd.ms-word",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.openxmlformats-officedocument.presentationml.slideshow"
+    );
 }

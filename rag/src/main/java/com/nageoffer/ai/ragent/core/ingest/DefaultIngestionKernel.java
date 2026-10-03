@@ -149,16 +149,20 @@ public class DefaultIngestionKernel implements IngestionKernel {
         return result;
     }
 
-    private Block sanitizeSingleBlock(Block block) {
+    /**
+     * 对单个 Block 脱敏；包级可见供测试直接覆盖各 Block 类型的分支，
+     * 走 run() 需要 mock 整条摄取链（含静态 MimeTypeDetector），测这一层不划算
+     */
+    Block sanitizeSingleBlock(Block block) {
         if (block instanceof ParagraphBlock b) {
             String filtered = SensitiveDataFilter.filter(b.text());
-            return filtered.equals(b.text()) ? b : new ParagraphBlock(b.provenance(), filtered);
+            return unchanged(filtered, b.text()) ? b : new ParagraphBlock(b.provenance(), filtered);
         } else if (block instanceof HeadingBlock b) {
             String filtered = SensitiveDataFilter.filter(b.text());
-            return filtered.equals(b.text()) ? b : new HeadingBlock(b.provenance(), b.level(), filtered);
+            return unchanged(filtered, b.text()) ? b : new HeadingBlock(b.provenance(), b.level(), filtered);
         } else if (block instanceof CodeBlock b) {
             String filtered = SensitiveDataFilter.filter(b.code());
-            return filtered.equals(b.code()) ? b : new CodeBlock(b.provenance(), b.language(), filtered);
+            return unchanged(filtered, b.code()) ? b : new CodeBlock(b.provenance(), b.language(), filtered);
         } else if (block instanceof ListBlock b) {
             List<String> filteredItems = filterStringList(b.items());
             return filteredItems == b.items() ? b : new ListBlock(b.provenance(), b.ordered(), filteredItems);
@@ -169,16 +173,28 @@ public class DefaultIngestionKernel implements IngestionKernel {
             return changed ? new TableBlock(b.provenance(), filteredHeaders, filteredRows) : b;
         } else if (block instanceof HtmlTableBlock b) {
             String filtered = SensitiveDataFilter.filter(b.html());
-            return filtered.equals(b.html()) ? b : new HtmlTableBlock(b.provenance(), filtered);
+            return unchanged(filtered, b.html()) ? b : new HtmlTableBlock(b.provenance(), filtered);
         } else if (block instanceof ImageBlock b) {
             String caption = SensitiveDataFilter.filter(b.caption());
             String altText = SensitiveDataFilter.filter(b.altText());
             String desc = SensitiveDataFilter.filter(b.description());
-            boolean changed = !caption.equals(b.caption()) || !altText.equals(b.altText())
-                    || !Objects.equals(desc, b.description());
+            boolean changed = !unchanged(caption, b.caption())
+                    || !unchanged(altText, b.altText())
+                    || !unchanged(desc, b.description());
             return changed ? new ImageBlock(b.provenance(), b.asset(), caption, altText, desc) : b;
         }
         return block;
+    }
+
+    /**
+     * 脱敏结果与原值是否一致（true 表示没改动、可复用原块）
+     * <p>
+     * 各 Block 的文本字段都可能为空——图片没有题注是常态——而 {@link SensitiveDataFilter#filter}
+     * 对 null 原样返回，所以比较必须走 null 安全的 {@link Objects#equals}：
+     * 直接 {@code filtered.equals(origin)} 会在空字段上抛 NPE，让整篇文档入库失败
+     */
+    private static boolean unchanged(String filtered, String origin) {
+        return Objects.equals(filtered, origin);
     }
 
     private List<String> filterStringList(List<String> items) {
@@ -188,9 +204,10 @@ public class DefaultIngestionKernel implements IngestionKernel {
         List<String> result = new java.util.ArrayList<>(items.size());
         boolean changed = false;
         for (String item : items) {
+            // 表格空单元格、列表空项都会传进 null，与 sanitizeSingleBlock 同理不能直接 .equals
             String filtered = SensitiveDataFilter.filter(item);
             result.add(filtered);
-            if (!filtered.equals(item)) {
+            if (!unchanged(filtered, item)) {
                 changed = true;
             }
         }

@@ -33,6 +33,7 @@ import com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget;
 import com.nageoffer.ai.ragent.core.parser.CsvDocumentParser;
 import com.nageoffer.ai.ragent.core.parser.MarkdownDocumentParser;
 import com.nageoffer.ai.ragent.core.parser.TikaDocumentParser;
+import com.nageoffer.ai.ragent.core.parser.mineru.MinerUProperties;
 import com.nageoffer.ai.ragent.core.parser.mime.MimeTypeDetector;
 import com.nageoffer.ai.ragent.core.parser.model.Block;
 import com.nageoffer.ai.ragent.core.parser.registry.ParseProfile;
@@ -88,7 +89,9 @@ class ChunkingFixtureTest {
     private static final ParserRegistry REGISTRY = new ParserRegistry(List.of(
             new MarkdownDocumentParser(),
             new CsvDocumentParser(),
-            new TikaDocumentParser()
+            // 空 key 表示没有 MinerU，此时 Tika 会补认领 PDF / Word / PPT，
+            // 于是这两个 fixture 也能离线跑通，不再依赖外部 SaaS
+            new TikaDocumentParser(new MinerUProperties())
     ));
 
     @Test

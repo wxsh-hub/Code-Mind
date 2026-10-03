@@ -78,6 +78,9 @@ public class IngestionSpecSchemaProvider {
      */
     public IngestionSpecSchemaVO describe() {
         ChunkBudget defaults = ChunkBudget.defaults();
+        // 保真档目前无人认领（Excel 已改由本地 POI 承担，见 MinerUDocumentParser 的说明），
+        // 于是没有任何格式会被判为「档位敏感」，下方 profileExtensions 恒为空、前端整块隐藏选择器。
+        // 保留这一项是为了 MinerU 恢复后不必再动这里；在那之前它不会被下发到任何格式上
         List<IngestionSpecSchemaVO.Option> profiles = List.of(
                 new IngestionSpecSchemaVO.Option(ParseProfile.FAST.getCode(), "规整表格",
                         "一行一条记录、表头只有一层，秒级完成"),
