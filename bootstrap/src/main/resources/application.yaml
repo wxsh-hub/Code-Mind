@@ -43,7 +43,11 @@ ragent:
 agent:
   chat:
     provider: siliconflow   # 引用 ai.providers 下的供应商，取其 url / api-key / endpoints.chat
-    model: deepseek-ai/DeepSeek-V4-Pro    # 直接传给 OpenAI 兼容端点的模型名
+    # 直接传给 OpenAI 兼容端点的模型名。
+    # 不用 V4-Pro：它是推理模型，会先吐一大段 reasoning_content，一句寒暄也要几十秒、
+    # 近 1MB 流式数据，长连接中途被重置的概率随之升高（表现为前端「生成失败」）。
+    # Flash 不产 reasoning_content，同题延迟低一个量级
+    model: deepseek-ai/DeepSeek-V4-Flash
   max-iters: 10         # ReAct 循环上限，超出后熔断收尾
   max-retries: 2        # 单次模型调用失败重试次数
   sse-timeout-ms: 900000

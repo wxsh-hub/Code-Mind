@@ -89,5 +89,14 @@ bootstrap/src/main/resources/application-local.yaml
 id_rsa
 id_ed25519
 
+# SSL 证书私钥与口令：JKS / PFX 均为含私钥的容器
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystorePass.txt
+*_jks/
+*_pfx/
+
 # 本地素材原件，成品已放 frontend/public/
 默认头像.png

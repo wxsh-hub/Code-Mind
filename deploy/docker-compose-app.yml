@@ -1,0 +1,25 @@
+# Code-Mind 应用容器
+#
+# 与基础设施（cm-postgres / cm-rocketmq-*）分开管理：
+# 前者是应用，随版本更新；后者是数据与服务，长期不变。
+#
+# 用 host 网络而非 bridge：application-server.yaml 里 PostgreSQL、Redis、
+# MinIO、RocketMQ 的地址全是 127.0.0.1（与应用同机部署的写法），
+# host 网络下容器直接复用宿主回环，配置无需为容器化改动。
+# 代价是端口不再由 Docker 隔离，9090 与宿主共享。
+services:
+  app:
+    image: code-mind:latest
+    container_name: code-mind-app
+    network_mode: host
+    volumes:
+      # 含 API Key，只读挂载，不打进镜像
+      - /opt/code-mind/app/application-server.yaml:/app/config/application-server.yaml:ro
+      - /opt/code-mind/logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -X POST http://127.0.0.1:9090/api/ragent/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"admin\"}' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
