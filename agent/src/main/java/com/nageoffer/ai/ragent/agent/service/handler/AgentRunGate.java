@@ -54,7 +54,9 @@ public class AgentRunGate {
         String slotValue = taskId + SLOT_SEPARATOR + conversationId;
         RBucket<String> slot = redissonClient.getBucket(runningKey(userId));
         if (!slot.setIfAbsent(slotValue, ttl())) {
-            throw new ClientException("当前会话处理中，请稍后再发起新的对话");
+            // 闸门是按用户限的（一个用户同时只跑一条流），不限于同一个会话；
+            // 文案若写成「当前会话处理中」，用户在另一个会话里发问时会看不懂为什么被拒
+            throw new ClientException("上一条对话还在处理中，请等它结束后再发送");
         }
         return () -> release(userId, slotValue);
     }
