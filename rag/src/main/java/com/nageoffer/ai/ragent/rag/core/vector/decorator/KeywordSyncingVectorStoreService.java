@@ -73,6 +73,15 @@ public class KeywordSyncingVectorStoreService implements VectorStoreService {
         syncKeyword(null, () -> keywordIndexService.deleteChunksByIds(collectionName, chunkIds));
     }
 
+    @Override
+    public void markDeprecated(String collectionName, String chunkId, boolean deprecated) {
+        delegate.markDeprecated(collectionName, chunkId, deprecated);
+        // 关键词索引侧有意不同步：ES 文档结构里没有废弃概念，只能整条删除，
+        // 而删除不可逆——矛盾审核被推翻时这条就回不来了。要在这里补标记，
+        // 得先给 KeywordIndexService 加废弃字段并同步改检索侧的过滤条件。
+        // 当前 rag.keyword.type=none（ES 未启用），故不构成线上影响。
+    }
+
     /**
      * best-effort 执行关键词同步，失败仅告警，不影响向量主链路
      */

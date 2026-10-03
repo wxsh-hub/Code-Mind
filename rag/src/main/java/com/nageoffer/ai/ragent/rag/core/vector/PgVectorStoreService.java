@@ -85,11 +85,23 @@ public class PgVectorStoreService implements VectorStoreService {
     }
 
     @Override
+    public void markDeprecated(String collectionName, String chunkId, boolean deprecated) {
+        // noinspection SqlDialectInspection,SqlNoDataSourceInspection
+        int updated = jdbcTemplate.update(
+                "UPDATE t_knowledge_vector SET deprecated = ? WHERE id = ? AND collection_name = ?",
+                deprecated, chunkId, collectionName);
+        log.info("更新向量废弃标记，collectionName={}, chunkId={}, deprecated={}, 影响行数={}",
+                collectionName, chunkId, deprecated, updated);
+    }
+
+    @Override
     public void updateChunk(String collectionName, String docId, EmbeddedChunk chunk) {
+        // 内容被重写时一并解除废弃：这条已经不是原先那条被判定有误的知识了，
+        // 不重置的话，矛盾审核接受后新内容会顶着旧标记继续被检索排除，等于没改
         // noinspection SqlDialectInspection,SqlNoDataSourceInspection
         jdbcTemplate.update(
                 "INSERT INTO t_knowledge_vector (id, collection_name, content, metadata, embedding) VALUES (?, ?, ?, ?::jsonb, ?::vector) " +
-                        "ON CONFLICT (id) DO UPDATE SET collection_name = EXCLUDED.collection_name, content = EXCLUDED.content, metadata = EXCLUDED.metadata, embedding = EXCLUDED.embedding",
+                        "ON CONFLICT (id) DO UPDATE SET collection_name = EXCLUDED.collection_name, content = EXCLUDED.content, metadata = EXCLUDED.metadata, embedding = EXCLUDED.embedding, deprecated = FALSE",
                 chunk.chunkId(),
                 collectionName,
                 chunk.content(),

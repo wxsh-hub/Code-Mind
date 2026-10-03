@@ -653,12 +653,14 @@ CREATE TABLE t_knowledge_vector (
     embedding       vector(1536),
     confidence      INT         DEFAULT 1,
     upload_count    INT         DEFAULT 1,
-    last_upload_at  TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
+    last_upload_at  TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    deprecated      BOOLEAN     DEFAULT FALSE
 );
 
 CREATE INDEX idx_kv_collection_name ON t_knowledge_vector (collection_name);
 CREATE INDEX idx_kv_metadata ON t_knowledge_vector USING gin(metadata);
 CREATE INDEX idx_kv_embedding ON t_knowledge_vector USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX idx_kv_collection_deprecated ON t_knowledge_vector (collection_name, deprecated);
 COMMENT ON TABLE t_knowledge_vector IS '知识库向量存储表';
 COMMENT ON COLUMN t_knowledge_vector.id IS '分块ID';
 COMMENT ON COLUMN t_knowledge_vector.confidence IS '置信度分数（相似向量提交次数）';
@@ -668,6 +670,42 @@ COMMENT ON COLUMN t_knowledge_vector.collection_name IS '知识库Collection';
 COMMENT ON COLUMN t_knowledge_vector.content IS '分块文本内容';
 COMMENT ON COLUMN t_knowledge_vector.metadata IS '元数据';
 COMMENT ON COLUMN t_knowledge_vector.embedding IS '向量';
+COMMENT ON COLUMN t_knowledge_vector.deprecated IS '是否已废弃：为真时不参与向量检索';
+
+-- ============================================
+-- Knowledge Conflict Table
+-- ============================================
+
+CREATE TABLE t_knowledge_conflict (
+    id               VARCHAR(20) NOT NULL PRIMARY KEY,
+    kb_id            VARCHAR(20) NOT NULL,
+    chunk_id         VARCHAR(20) NOT NULL,
+    related_chunk_id VARCHAR(20),
+    chunk_content    TEXT,
+    reason           TEXT        NOT NULL,
+    suggestion       TEXT,
+    status           VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+    submitted_by     VARCHAR(64),
+    reviewed_by      VARCHAR(64),
+    review_comment   TEXT,
+    review_time      TIMESTAMP,
+    create_time      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted          SMALLINT    NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_kconflict_status_time ON t_knowledge_conflict (status, create_time DESC);
+CREATE INDEX idx_kconflict_chunk ON t_knowledge_conflict (chunk_id);
+COMMENT ON TABLE t_knowledge_conflict IS '知识矛盾记录：由 AI 或人工提出，后台审核后处置';
+COMMENT ON COLUMN t_knowledge_conflict.kb_id IS '所属知识库';
+COMMENT ON COLUMN t_knowledge_conflict.chunk_id IS '被质疑的知识分块 ID';
+COMMENT ON COLUMN t_knowledge_conflict.related_chunk_id IS '与哪一条冲突，可为空（仅指出本条有误时）';
+COMMENT ON COLUMN t_knowledge_conflict.chunk_content IS '提交时被质疑分块的原文快照，审核时对照用';
+COMMENT ON COLUMN t_knowledge_conflict.reason IS '矛盾原因：为什么认为这条不对';
+COMMENT ON COLUMN t_knowledge_conflict.suggestion IS '建议改成什么，接受审核时用它替换原文';
+COMMENT ON COLUMN t_knowledge_conflict.status IS '审核状态：PENDING 待审核 / ACCEPTED 已接受 / REJECTED 已拒绝';
+COMMENT ON COLUMN t_knowledge_conflict.review_comment IS '审核意见';
+COMMENT ON COLUMN t_knowledge_conflict.review_time IS '审核时间';
 
 -- ============================================
 -- Column Comments

@@ -67,4 +67,15 @@ public interface VectorStoreService {
      * @param chunkIds       chunk 唯一标识列表
      */
     void deleteChunksByIds(String collectionName, List<String> chunkIds);
+
+    /**
+     * 标记/解除 chunk 的废弃状态
+     * <p>
+     * 废弃的知识不再参与检索，但不物理删除——矛盾审核若被推翻还要放回来
+     *
+     * @param collectionName 向量空间名称（知识库 collectionName）
+     * @param chunkId        chunk 的唯一标识
+     * @param deprecated     是否废弃
+     */
+    void markDeprecated(String collectionName, String chunkId, boolean deprecated);
 }

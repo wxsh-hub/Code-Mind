@@ -76,6 +76,12 @@ public class GraphSyncingVectorStoreService implements VectorStoreService {
         // 子文档粒度，Phase1 不单独同步图谱（见类注释）
     }
 
+    @Override
+    public void markDeprecated(String collectionName, String chunkId, boolean deprecated) {
+        delegate.markDeprecated(collectionName, chunkId, deprecated);
+        // 废弃只影响本仓库的向量召回，图谱是独立的一份数据（按 file_path 归属），此处不动
+    }
+
     /**
      * 图谱 file_source 编码，读取侧的归属判定与删除匹配依赖同一格式，见 {@link GraphFileSource}
      */

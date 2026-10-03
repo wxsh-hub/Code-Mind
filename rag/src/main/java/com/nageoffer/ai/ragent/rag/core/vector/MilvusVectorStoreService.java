@@ -171,6 +171,23 @@ public class MilvusVectorStoreService implements VectorStoreService {
                 collectionName, chunkIds.size(), resp.getDeleteCnt());
     }
 
+    /**
+     * 废弃标记在 Milvus 侧暂未实现
+     * <p>
+     * Milvus 的 JSON 字段不支持原地更新，改 metadata 只能整行 upsert（需带上原向量），
+     * 且 collection 里没有独立的标量列可挂标记。要做需要先改 collection schema 并在
+     * 检索侧补过滤条件，属独立改动。
+     * <p>
+     * 当前 {@code rag.vector.type=pg}（默认走 PostgreSQL），本实现不会被装配。
+     * 这里显式告警而非静默返回：一旦有人切到 Milvus，矛盾审核的「废弃」会失去效果，
+     * 这件事必须在日志里看得见
+     */
+    @Override
+    public void markDeprecated(String collectionName, String chunkId, boolean deprecated) {
+        log.warn("Milvus 向量存储不支持废弃标记，本次调用被忽略（矛盾审核的废弃在 Milvus 下不生效）："
+                + "collection={}, chunkId={}, deprecated={}", collectionName, chunkId, deprecated);
+    }
+
     private List<float[]> extractVectors(List<EmbeddedChunk> chunks, int expectedDim) {
         List<float[]> vectors = new ArrayList<>(chunks.size());
         for (EmbeddedChunk chunk : chunks) {

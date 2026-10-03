@@ -17,11 +17,15 @@
 
 package com.nageoffer.ai.ragent.knowledge.controller;
 
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.nageoffer.ai.ragent.framework.convention.Result;
 import com.nageoffer.ai.ragent.framework.web.Results;
+import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeBaseDO;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeChunkDO;
+import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeBaseMapper;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeChunkMapper;
+import com.nageoffer.ai.ragent.rag.core.vector.VectorStoreService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,6 +49,8 @@ import java.util.Map;
 public class KnowledgeChunkApiController {
 
     private final KnowledgeChunkMapper chunkMapper;
+    private final KnowledgeBaseMapper knowledgeBaseMapper;
+    private final VectorStoreService vectorStoreService;
 
     /**
      * 相似 chunk 检索（供外部系统调用，如矛盾检测）
@@ -55,9 +61,12 @@ public class KnowledgeChunkApiController {
     @PostMapping("/knowledge-base/search/similar")
     public Result<List<Map<String, Object>>> searchSimilar(
             @RequestBody SimilarSearchRequest request) {
+        // 排除已废弃：废弃意味着这条知识已被判定过时，不该再作为依据返回；
+        // 调用方拿它去找「哪条有问题」时也无需再看到已经被处置过的
         LambdaQueryWrapper<KnowledgeChunkDO> wrapper = new LambdaQueryWrapper<KnowledgeChunkDO>()
                 .eq(KnowledgeChunkDO::getEnabled, 1)
-                .eq(KnowledgeChunkDO::getDeleted, 0);
+                .eq(KnowledgeChunkDO::getDeleted, 0)
+                .eq(KnowledgeChunkDO::getDeprecated, false);
 
         // 内容匹配
         if (request.getQuery() != null && !request.getQuery().isEmpty()) {
@@ -167,13 +176,26 @@ public class KnowledgeChunkApiController {
 
     /**
      * 标记 chunk 为已废弃
+     * <p>
+     * 需同时落到向量表：检索侧读的是 t_knowledge_vector，此前只写 chunk 表的
+     * deprecated 字段，导致「废弃」对召回毫无影响
      */
     @PostMapping("/knowledge-base/chunks/{chunkId}/deprecate")
     public Result<Void> deprecate(@PathVariable String chunkId) {
+        KnowledgeChunkDO chunk = chunkMapper.selectById(chunkId);
+        if (chunk == null) {
+            return Results.success();
+        }
+
         KnowledgeChunkDO update = new KnowledgeChunkDO();
         update.setId(chunkId);
         update.setDeprecated(true);
         chunkMapper.updateById(update);
+
+        KnowledgeBaseDO knowledgeBase = knowledgeBaseMapper.selectById(chunk.getKbId());
+        if (knowledgeBase != null && StrUtil.isNotBlank(knowledgeBase.getCollectionName())) {
+            vectorStoreService.markDeprecated(knowledgeBase.getCollectionName(), chunkId, true);
+        }
         return Results.success();
     }
 

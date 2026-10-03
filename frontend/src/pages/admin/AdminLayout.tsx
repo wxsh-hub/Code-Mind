@@ -22,9 +22,7 @@ import {
   ShieldCheck,
   Settings,
   Tag,
-  Upload,
   Users,
-  FolderKanban,
   Workflow,
   type LucideIcon
 } from "lucide-react";
@@ -94,6 +92,12 @@ const menuGroups: MenuGroup[] = [
         icon: Database
       },
       {
+        // 紧跟知识库管理：审的是知识库内容的对错，与传文档同属一条工作流
+        path: "/admin/conflict-review",
+        label: "矛盾审核",
+        icon: AlertTriangle
+      },
+      {
         path: "/admin/knowledge-graph",
         label: "知识图谱",
         icon: Share2
@@ -113,26 +117,6 @@ const menuGroups: MenuGroup[] = [
             path: "/admin/intent-list",
             label: "意图列表",
             icon: ClipboardList
-          }
-        ]
-      },
-      {
-        id: "ingestion",
-        path: "/admin/ingestion",
-        label: "数据通道",
-        icon: Upload,
-        children: [
-          {
-            path: "/admin/ingestion",
-            label: "流水线管理",
-            icon: FolderKanban,
-            search: "?tab=pipelines"
-          },
-          {
-            path: "/admin/ingestion",
-            label: "流水线任务",
-            icon: ClipboardList,
-            search: "?tab=tasks"
           }
         ]
       },
@@ -160,11 +144,6 @@ const menuGroups: MenuGroup[] = [
         path: "/admin/feature-metadata",
         label: "功能元数据标记",
         icon: Tag
-      },
-      {
-        path: "/admin/conflict-review",
-        label: "矛盾审核",
-        icon: AlertTriangle
       },
     ]
   },
@@ -346,17 +325,15 @@ export function AdminLayout() {
   const avatarUrl = user?.avatar?.trim();
   const showAvatar = Boolean(avatarUrl);
   const roleLabel = user?.role === "admin" ? "管理员" : "成员";
-  const isIngestionActive = location.pathname.startsWith("/admin/ingestion");
   const isIntentActive =
     location.pathname.startsWith("/admin/intent-tree") || location.pathname.startsWith("/admin/intent-list");
 
   useEffect(() => {
     setOpenGroups((prev) => ({
       ...prev,
-      ingestion: prev.ingestion || isIngestionActive,
       intent: prev.intent || isIntentActive
     }));
-  }, [isIngestionActive, isIntentActive]);
+  }, [isIntentActive]);
 
   const handlePasswordSubmit = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword) {
@@ -465,7 +442,7 @@ export function AdminLayout() {
             </div>
             {!collapsed && (
               <div className="min-w-0">
-                <h1 className="admin-sidebar__title">Ragent AI 管理后台</h1>
+                <h1 className="admin-sidebar__title">CodeMind 管理后台</h1>
                 <p className="admin-sidebar__subtitle">Knowledge Console</p>
               </div>
             )}
