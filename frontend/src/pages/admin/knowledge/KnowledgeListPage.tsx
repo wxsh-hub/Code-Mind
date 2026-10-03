@@ -314,7 +314,7 @@ export function KnowledgeListPage() {
                   <TableHead className="w-[120px]">负责人</TableHead>
                   <TableHead className="w-[160px]">创建时间</TableHead>
                   <TableHead className="w-[160px]">修改时间</TableHead>
-                  <TableHead className="w-[150px] text-left">操作</TableHead>
+                  <TableHead className="w-[240px] text-left">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -354,6 +354,16 @@ export function KnowledgeListPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">
+                        {/* 主入口按钮：此前只能点知识库名字进文档页，入口不明显；
+                            建成主色调并置于最前，与「编辑 / 删除」拉开层级 */}
+                        <Button
+                          size="sm"
+                          className="admin-primary-gradient"
+                          onClick={() => navigate(`/admin/knowledge/${kb.id}`)}
+                        >
+                          <FolderOpen className="w-4 h-4 mr-1" />
+                          管理
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"

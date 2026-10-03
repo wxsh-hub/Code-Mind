@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Check, ChevronDown, ChevronRight, FileUp, FileImage, Info, PlayCircle, RefreshCw, Trash2, Pencil, FileBarChart, X, Eye, MoreHorizontal, FileText, FileSpreadsheet, Link as LinkIcon, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -43,11 +43,30 @@ import { getErrorMessage } from "@/utils/error";
 
 const PAGE_SIZE = 10;
 
+/**
+ * 未终态文档的轮询节奏：3 秒一次，最多 200 次（约 10 分钟）
+ */
+const POLL_INTERVAL_MS = 3000;
+const MAX_POLL_TICKS = 200;
+
+/**
+ * 文档状态的中文呈现
+ * <p>
+ * pending 用琥珀色加重：上传后不点「分块」就一直停在这个状态，且此时检索不到该文档，
+ * 是这条链路上最容易漏掉的一步，配色上要能一眼认出来
+ */
+const STATUS_META: Record<string, { label: string; className: string }> = {
+  pending: { label: "待入库", className: "border-amber-300 bg-amber-50 text-amber-700" },
+  running: { label: "处理中", className: "border-blue-300 bg-blue-50 text-blue-700" },
+  success: { label: "已入库", className: "border-emerald-300 bg-emerald-50 text-emerald-700" },
+  failed: { label: "失败", className: "border-red-300 bg-red-50 text-red-700" }
+};
+
 const STATUS_OPTIONS = [
-  { value: "pending", label: "pending" },
-  { value: "running", label: "running" },
-  { value: "failed", label: "failed" },
-  { value: "success", label: "success" }
+  { value: "pending", label: "待入库" },
+  { value: "running", label: "处理中" },
+  { value: "failed", label: "失败" },
+  { value: "success", label: "已入库" }
 ];
 
 const SOURCE_OPTIONS = [
@@ -348,6 +367,8 @@ export function KnowledgeDocumentsPage() {
   const navigate = useNavigate();
   const [kb, setKb] = useState<KnowledgeBase | null>(null);
   const [pageData, setPageData] = useState<PageResult<KnowledgeDocument> | null>(null);
+  // 轮询计数：文档全部落定后清零，避免长时间停留页面时把轮询变成无限请求
+  const pollTicksRef = useRef(0);
   // 页码塞进 history state（不进 URL，保持 RESTful 路径），离开分块页 navigate(-1) 返回时自动恢复
   const location = useLocation();
   const current = Math.max(1, Number((location.state as { page?: number } | null)?.page) || 1);
@@ -384,7 +405,9 @@ export function KnowledgeDocumentsPage() {
   const [logLoading, setLogLoading] = useState(false);
   const [previewTarget, setPreviewTarget] = useState<KnowledgeDocument | null>(null);
 
-  const documents = pageData?.records || [];
+  // useMemo 稳定引用：直接写成 `pageData?.records || []` 时，pageData 为空的那几次渲染
+  // 会产出新数组，令依赖它的轮询 effect 每次渲染都重建 interval，可能一直触发不到
+  const documents = useMemo(() => pageData?.records ?? [], [pageData]);
   const [pipelineMap, setPipelineMap] = useState<Map<string, string>>(new Map());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchOperating, setBatchOperating] = useState(false);
@@ -493,6 +516,31 @@ export function KnowledgeDocumentsPage() {
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
+
+  /**
+   * 有文档处于未终态时轮询刷新
+   * <p>
+   * 分块是 MQ 异步任务：提交后立刻刷新拿到的还是 running，若就此打住，页面会一直停在
+   * running——用户以为卡住了，其实后端早已完成，必须手动刷新才看得到结果。
+   * 上限约 10 分钟：个别文档可能永久卡在 running，不能让轮询退化成无限请求
+   */
+  useEffect(() => {
+    const pending = documents.some((doc) =>
+      ["pending", "running"].includes((doc.status || "").toLowerCase())
+    );
+    if (!pending) {
+      pollTicksRef.current = 0;
+      return;
+    }
+    if (pollTicksRef.current >= MAX_POLL_TICKS) {
+      return;
+    }
+    const timer = setInterval(() => {
+      pollTicksRef.current += 1;
+      loadDocuments(current, statusFilter, keyword);
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [documents, current, statusFilter, keyword, loadDocuments]);
 
   useEffect(() => {
     if (detailTarget) {
@@ -756,6 +804,11 @@ export function KnowledgeDocumentsPage() {
             <div>
               <CardTitle>文档列表</CardTitle>
               <CardDescription>支持筛选与分块管理</CardDescription>
+              {/* 上传只落盘不建索引，必须点「分块」触发解析与向量化才进检索；漏点等于白传 */}
+              <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-amber-600">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>上传的文件默认为未入库状态，需点击右侧的「分块」按钮完成入库，之后才能被检索到。</span>
+              </p>
             </div>
             <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
               <Input
@@ -809,7 +862,7 @@ export function KnowledgeDocumentsPage() {
                       />
                     </TableHead>
                     <TableHead className="w-[280px]">文档</TableHead>
-                    <TableHead className="w-[110px]">状态</TableHead>
+                    <TableHead className="w-[150px]">状态</TableHead>
                     <TableHead className="w-[70px]">启用</TableHead>
                     <TableHead className="w-[80px]">分块数</TableHead>
                     <TableHead className="w-[100px]">模块</TableHead>
@@ -861,10 +914,29 @@ export function KnowledgeDocumentsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className={cn("h-2 w-2 rounded-full", statusDotClass(doc.status))} />
-                        <span>{doc.status || "-"}</span>
-                      </div>
+                      {(() => {
+                        const meta = STATUS_META[(doc.status || "").toLowerCase()];
+                        // 待入库额外给一句动作提示：光看到状态不知道要做什么，等于没提示
+                        const needChunk = (doc.status || "").toLowerCase() === "pending";
+                        return (
+                          <div className="flex flex-col items-start gap-1">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium",
+                                meta?.className ?? "border-slate-200 bg-slate-50 text-slate-500"
+                              )}
+                            >
+                              <span className={cn("h-1.5 w-1.5 rounded-full", statusDotClass(doc.status))} />
+                              {meta?.label ?? (doc.status || "-")}
+                            </span>
+                            {needChunk ? (
+                              <span className="whitespace-nowrap text-[11px] text-amber-600">
+                                点右侧「分块」入库
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       {(() => {
@@ -1574,7 +1646,7 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
   const budgetFields = (specSchema?.budgetFields ?? [])
     .filter((field) => field.key !== "rowsPerChunk" || isTableType);
 
-  const loadPipelines = async () => {
+  const loadPipelines = useCallback(async () => {
     setLoadingPipelines(true);
     try {
       const result = await getIngestionPipelines(1, 100);
@@ -1585,9 +1657,9 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
     } finally {
       setLoadingPipelines(false);
     }
-  };
+  }, []);
 
-  const loadModulesAndFeatures = async () => {
+  const loadModulesAndFeatures = useCallback(async () => {
     setLoadingModules(true);
     try {
       const [modulesData, featuresData] = await Promise.all([
@@ -1601,7 +1673,7 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
     } finally {
       setLoadingModules(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -1625,7 +1697,29 @@ function UploadDialog({ open, onOpenChange, onSubmit }: UploadDialogProps) {
         .then((settings) => setMaxFileSize(settings.upload.maxFileSize))
         .catch(() => {});
     }
-  }, [open, form]);
+  }, [open, form, loadModulesAndFeatures, loadPipelines]);
+
+  /**
+   * 弹窗里的「+ 创建模块」「+ 创建功能」是 target=_blank 新开标签页的，
+   * 用户在那边建完切回来时，本页不会重新挂载，下拉里仍是旧列表。
+   * 页面重新可见时补拉一次，否则刚建的模块要刷新整页才能选到。
+   */
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") {
+        loadModulesAndFeatures();
+      }
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    window.addEventListener("focus", refreshOnReturn);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+      window.removeEventListener("focus", refreshOnReturn);
+    };
+  }, [open, loadModulesAndFeatures]);
 
   useEffect(() => {
     if (isUrlSource) {

@@ -3495,6 +3495,25 @@ textarea {
   background: var(--agent-signal-wash);
 }
 
+/* 主行动按钮：实心高亮，与同排描边按钮拉开层级。
+   后台入口此前淹没在一排同款按钮里，用户反馈「不会按」 */
+.agent-app .agent-head-btn-primary {
+  color: #fff;
+  border-color: var(--agent-signal);
+  background: var(--agent-signal);
+  font-weight: 500;
+}
+
+.agent-app .agent-head-btn-primary:hover {
+  color: #fff;
+  border-color: var(--agent-signal-ink);
+  background: var(--agent-signal-ink);
+}
+
+.agent-app .agent-head-btn-primary .agent-btn-glyph {
+  color: #fff;
+}
+
 .agent-app .agent-head-btn .agent-btn-glyph {
   font-family: var(--agent-font-mono);
   font-size: var(--agent-t-xs);
@@ -4674,103 +4693,6 @@ textarea {
   font-size: var(--agent-t-xs);
   line-height: 1.4;
   color: var(--agent-muted);
-}
-
-/* ── 原始帧抽屉 ─────────────────────────── */
-.agent-app .agent-rawlog {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 440px;
-  max-width: 92vw;
-  background: var(--agent-surface);
-  border-left: var(--agent-hair-strong);
-  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.06);
-  display: grid;
-  grid-template-rows: auto 1fr;
-  z-index: 20;
-}
-
-.agent-app .agent-rawlog-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--agent-s3) var(--agent-s4);
-  border-bottom: var(--agent-hair-strong);
-}
-
-.agent-app .agent-rawlog-title {
-  font-family: var(--agent-font-mono);
-  font-size: var(--agent-t-sm);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--agent-muted);
-}
-
-.agent-app .agent-rawlog-close {
-  border: none;
-  background: transparent;
-  color: var(--agent-muted);
-  font-size: var(--agent-t-md);
-  padding: 4px 8px;
-  border-radius: var(--agent-radius);
-}
-
-.agent-app .agent-rawlog-close:hover {
-  color: var(--agent-ink);
-  background: var(--agent-sunk);
-}
-
-.agent-app .agent-rawlog-body {
-  overflow-y: auto;
-  padding: var(--agent-s3);
-  min-height: 0;
-}
-
-.agent-app .agent-rawlog-empty {
-  color: var(--agent-faint);
-  font-size: var(--agent-t-sm);
-  padding: var(--agent-s4);
-  text-align: center;
-}
-
-.agent-app .agent-frame {
-  border: var(--agent-hair);
-  border-radius: var(--agent-radius);
-  margin-bottom: var(--agent-s2);
-  overflow: hidden;
-}
-
-.agent-app .agent-frame-head {
-  display: flex;
-  gap: var(--agent-s2);
-  align-items: baseline;
-  padding: 5px var(--agent-s2);
-  background: var(--agent-sunk);
-  font-family: var(--agent-font-mono);
-  font-size: var(--agent-t-xs);
-}
-
-.agent-app .agent-frame-ts {
-  color: var(--agent-faint);
-}
-
-.agent-app .agent-frame-name {
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--agent-ink);
-}
-
-.agent-app .agent-frame-pre {
-  margin: 0;
-  padding: var(--agent-s2);
-  font-family: var(--agent-font-mono);
-  font-size: 0.68rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--agent-ink);
 }
 
 /* ── Markdown 排版：克制贴实验台调性 ────── */

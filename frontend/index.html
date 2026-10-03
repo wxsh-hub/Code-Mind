@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ragent AI 智能体</title>
+    <title>CodeMind 企业知识库</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <!--
+      刻意不引境外字体 CDN：head 中的外部样式表会阻塞渲染，
+      而该类域名在内地网络不可达，请求挂起到超时，表现为页面长时间白屏转圈。
+      CSS 中各字体族均已声明 ui-sans-serif / ui-monospace 等系统兜底，
+      去掉后仅少数装饰性文本回落系统字体，不影响布局。
+    -->
   </head>
   <body>
     <div id="root"></div>

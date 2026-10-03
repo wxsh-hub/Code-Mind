@@ -1,11 +1,29 @@
 import * as React from "react";
-import { Eye, EyeOff, Lock, User } from "lucide-react";
+import { Bot, Eye, EyeOff, Lock, Plug, ShieldAlert, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuthStore } from "@/stores/authStore";
+
+const FEATURES = [
+  {
+    icon: Bot,
+    title: "多 Agent 协同问答",
+    desc: "提问先识别意图，再并行检索企业知识，最后交给模型作答，答案可溯源到原文。"
+  },
+  {
+    icon: Plug,
+    title: "AI 自己往库里写知识",
+    desc: "把接入说明放进你常用的 AI 工具，它就能自行创建知识库、按「项目-模块-文档-日期」规范上传文档。"
+  },
+  {
+    icon: ShieldAlert,
+    title: "矛盾自动发现",
+    desc: "两篇说法矛盾时，AI 主动提出矛盾并标记过时版本，经人工确认后下架。"
+  }
+];
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -34,9 +52,38 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-4">
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-10">
       <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/50 to-blue-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900" />
-      <div className="relative z-10 w-full max-w-md rounded-3xl border border-border/70 bg-background/80 p-8 shadow-soft backdrop-blur">
+      <div className="relative z-10 grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[1.1fr_minmax(0,26rem)]">
+        <section className="hidden lg:block">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            CodeMind
+          </p>
+          <h1 className="mt-3 font-display text-3xl font-semibold leading-snug">
+            自成长的
+            <br />
+            企业知识库
+          </h1>
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
+            多 Agent 自动搭建：AI 一边回答，一边把散落的项目文档收进库里，
+            发现前后矛盾还会主动提出来。
+          </p>
+          <ul className="mt-8 space-y-5">
+            {FEATURES.map(({ icon: Icon, title, desc }) => (
+              <li key={title} className="flex gap-3.5">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/70">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium">{title}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div className="w-full rounded-3xl border border-border/70 bg-background/80 p-8 shadow-soft backdrop-blur">
         <div className="mb-6">
           <p className="font-display text-2xl font-semibold">欢迎回来</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -95,6 +142,7 @@ export function LoginPage() {
             {isLoading ? "正在登录..." : "登录"}
           </Button>
         </form>
+        </div>
       </div>
     </div>
   );

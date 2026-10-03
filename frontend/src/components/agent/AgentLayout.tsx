@@ -1,8 +1,9 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 
-import { AgentRawLog } from "@/components/agent/AgentRawLog";
+import { AgentGuideDialog } from "@/components/agent/AgentGuideDialog";
 import { AgentSidebar } from "@/components/agent/AgentSidebar";
+import { AgentSkillDialog } from "@/components/agent/AgentSkillDialog";
 import { getAgentMeta } from "@/services/agentService";
 import { useAuthStore } from "@/stores/authStore";
 import type { AgentEngineMeta } from "@/types/agent";
@@ -37,11 +38,12 @@ function useAgentMeta(): AgentMetaState {
 
 interface AgentHeaderProps {
   meta: AgentMetaState;
-  rawOpen: boolean;
-  onToggleRaw: () => void;
+  onOpenGuide: () => void;
+  onOpenSkill: () => void;
+  canExportSkill: boolean;
 }
 
-function AgentHeader({ meta, rawOpen, onToggleRaw }: AgentHeaderProps) {
+function AgentHeader({ meta, onOpenGuide, onOpenSkill, canExportSkill }: AgentHeaderProps) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === "admin";
@@ -52,9 +54,9 @@ function AgentHeader({ meta, rawOpen, onToggleRaw }: AgentHeaderProps) {
   return (
     <header className="agent-header">
       <div className="agent-brand">
-        <span className="agent-wordmark">RAGENT</span>
+        <span className="agent-wordmark">CodeMind</span>
         <span className="agent-brand-sep">/</span>
-        <span className="agent-brand-tag">智能体</span>
+        <span className="agent-brand-tag">企业知识库</span>
       </div>
 
       <div className="agent-header-center">
@@ -73,24 +75,34 @@ function AgentHeader({ meta, rawOpen, onToggleRaw }: AgentHeaderProps) {
       </div>
 
       <div className="agent-header-right">
-        {isAdmin && (
+        <button
+          type="button"
+          className="agent-head-btn"
+          onClick={onOpenGuide}
+          title="看看怎么提问、回答怎么读、知识从哪来"
+        >
+          <span className="agent-btn-glyph">?</span> 使用说明
+        </button>
+        {canExportSkill && (
           <button
             type="button"
             className="agent-head-btn"
+            onClick={onOpenSkill}
+            title="下载接入说明，放进你自己的 AI 工具目录，它就能读写这个知识库"
+          >
+            <span className="agent-btn-glyph">↓</span> 接入 AI
+          </button>
+        )}
+        {/* 主行动按钮：实心高亮。此前与其它按钮同款描边，多数人注意不到后台入口 */}
+        {isAdmin && (
+          <button
+            type="button"
+            className="agent-head-btn agent-head-btn-primary"
             onClick={() => navigate("/admin/dashboard")}
           >
             <span className="agent-btn-glyph">⚙</span> 管理后台
           </button>
         )}
-        <button
-          type="button"
-          className="agent-head-btn"
-          data-on={rawOpen}
-          onClick={onToggleRaw}
-          aria-pressed={rawOpen}
-        >
-          <span className="agent-btn-glyph">{"{ }"}</span> 原始帧
-        </button>
       </div>
     </header>
   );
@@ -101,17 +113,40 @@ interface AgentLayoutProps {
 }
 
 export function AgentLayout({ children }: AgentLayoutProps) {
-  const [rawOpen, setRawOpen] = React.useState(false);
   const meta = useAgentMeta();
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const [guideOpen, setGuideOpen] = React.useState(false);
+  const [skillOpen, setSkillOpen] = React.useState(false);
+
+  // 文档正文含 token，缺任一项就不给下载，避免导出半份不可用的说明
+  const canExportSkill = Boolean(user && token);
 
   return (
     <div className="agent-app">
-      <AgentHeader meta={meta} rawOpen={rawOpen} onToggleRaw={() => setRawOpen((v) => !v)} />
+      <AgentHeader
+        meta={meta}
+        onOpenGuide={() => setGuideOpen(true)}
+        onOpenSkill={() => setSkillOpen(true)}
+        canExportSkill={canExportSkill}
+      />
       <div className="agent-body">
         <AgentSidebar />
         <main className="agent-main">{children}</main>
-        {rawOpen ? <AgentRawLog onClose={() => setRawOpen(false)} /> : null}
       </div>
+      <AgentGuideDialog
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+        onOpenSkillExport={canExportSkill ? () => setSkillOpen(true) : undefined}
+      />
+      {canExportSkill && user && token ? (
+        <AgentSkillDialog
+          open={skillOpen}
+          onOpenChange={setSkillOpen}
+          username={user.username || String(user.userId)}
+          token={token}
+        />
+      ) : null}
     </div>
   );
 }

@@ -58,7 +58,7 @@ export function AgentChatInput() {
           className="agent-composer-input"
           value={value}
           rows={1}
-          placeholder="给 RagentAI 发送消息"
+          placeholder="给 CodeMind 发送消息"
           onChange={(event) => setValue(event.target.value)}
           onCompositionStart={() => {
             isComposingRef.current = true;

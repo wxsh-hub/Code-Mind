@@ -39,10 +39,19 @@ function parseData(raw: string): unknown {
   }
 }
 
+/**
+ * 已派发的事件计数，供调用方判断「这条流到底有没有开始」
+ * 重试只对「连接没建立起来」有意义；事件一旦开始下发，服务端那边这一轮已经在跑了
+ */
+interface StreamProgress {
+  dispatched: number;
+}
+
 async function readSseStream(
   response: Response,
   handlers: AgentStreamHandlers,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  progress?: StreamProgress
 ) {
   if (!response.body) {
     throw new Error("流式响应为空");
@@ -61,6 +70,9 @@ async function readSseStream(
     }
     const raw = dataLines.join("\n");
     const payload = parseData(raw);
+    if (progress) {
+      progress.dispatched += 1;
+    }
     handlers.onEvent?.(eventName, payload);
 
     switch (eventName) {
@@ -144,6 +156,7 @@ async function streamWithRetry(
 
   let attempt = 0;
   while (attempt <= retryCount) {
+    const progress: StreamProgress = { dispatched: 0 };
     try {
       const response = await fetch(url, {
         method: "GET",
@@ -155,7 +168,10 @@ async function streamWithRetry(
       });
 
       if (!response.ok) {
-        throw new Error(`SSE 请求失败（${response.status}）`);
+        // 非 2xx 时服务端仍会带上原因（如闸门拒绝的「当前会话处理中」）。
+        // 只报状态码等于把可操作的信息丢掉，用户只能看到无意义的 500
+        const reason = await readErrorMessage(response);
+        throw new AgentStreamRejectionError(reason || `SSE 请求失败（${response.status}）`);
       }
 
       // @IdempotentSubmit 拦截时返回 200 + JSON 体而非事件流
@@ -165,7 +181,7 @@ async function streamWithRetry(
         throw new AgentStreamRejectionError(body?.message || "请求失败");
       }
 
-      await readSseStream(response, handlers, signal);
+      await readSseStream(response, handlers, signal, progress);
       return;
     } catch (error) {
       const err = error as Error;
@@ -175,12 +191,38 @@ async function streamWithRetry(
       if (err instanceof AgentStreamRejectionError) {
         throw err;
       }
+      // 事件已开始下发说明服务端这一轮已经在跑：重发会再开一条流，
+      // 而前一条还占着并发闸门，重试必然撞上「当前会话处理中」——正是要避免的失败
+      if (progress.dispatched > 0) {
+        throw err;
+      }
       if (attempt >= retryCount) {
         throw err;
       }
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt)));
       attempt += 1;
     }
+  }
+}
+
+/**
+ * 从非 2xx 响应里取服务端给的原因
+ * SSE 请求失败时响应体可能是 JSON、纯文本或空，取不到就返回空串由调用方兜底
+ */
+async function readErrorMessage(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    if (!text) {
+      return "";
+    }
+    try {
+      const parsed = JSON.parse(text) as { message?: string; error?: string };
+      return parsed.message || parsed.error || "";
+    } catch {
+      return text.slice(0, 200);
+    }
+  } catch {
+    return "";
   }
 }
 
