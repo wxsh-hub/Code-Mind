@@ -56,6 +56,19 @@ public class AgentRunHandle {
     private volatile Disposable disposable;
     private volatile Runnable interruptAction;
 
+    /**
+     * 本次运行的最终结局。释放钩子签名固定为 Runnable 带不出状态，
+     * 而链路追踪要按成功/失败/打断分开记，故在结算时落定、钩子读取
+     */
+    @Getter
+    private volatile AgentRunOutcome outcome = AgentRunOutcome.RUNNING;
+
+    /**
+     * 失败原因，仅 outcome=FAILED 时有值
+     */
+    @Getter
+    private volatile String errorMessage;
+
     public AgentRunHandle(String taskId, SseEmitterSender sender, StreamTaskManager taskManager) {
         this.taskId = taskId;
         this.sender = sender;
@@ -113,18 +126,22 @@ public class AgentRunHandle {
     }
 
     public void complete(Runnable body) {
+        outcome = AgentRunOutcome.COMPLETED;
         if (settle(body)) {
             sender.complete();
         }
     }
 
     public void cancel(Runnable body) {
+        outcome = AgentRunOutcome.CANCELLED;
         if (settle(body)) {
             sender.complete();
         }
     }
 
     public void fail(Throwable error, Runnable body) {
+        outcome = AgentRunOutcome.FAILED;
+        errorMessage = error == null ? null : error.getMessage();
         if (settle(body)) {
             sender.fail(error);
         }

@@ -20,6 +20,7 @@ package com.nageoffer.ai.ragent.agent.service.impl;
 import com.nageoffer.ai.ragent.agent.config.ReActAgentProvider;
 import com.nageoffer.ai.ragent.agent.config.ReActAgentProvider.ActiveAgent;
 import com.nageoffer.ai.ragent.agent.service.AgentConversationService;
+import com.nageoffer.ai.ragent.agent.service.handler.AgentChatTraceRecorder;
 import com.nageoffer.ai.ragent.agent.service.handler.AgentRunGate;
 import com.nageoffer.ai.ragent.agent.tool.AgentToolCatalog.ResolvedCatalog;
 import com.nageoffer.ai.ragent.framework.context.LoginUser;
@@ -61,6 +62,7 @@ class AgentChatServiceImplTest {
     private AgentConversationService conversationService;
     private StreamTaskManager taskManager;
     private AgentRunGate runGate;
+    private AgentChatTraceRecorder traceRecorder;
     private AtomicInteger gateReleased;
     private ReActAgent agent;
     private AgentChatServiceImpl service;
@@ -71,8 +73,9 @@ class AgentChatServiceImplTest {
         conversationService = mock(AgentConversationService.class);
         taskManager = mock(StreamTaskManager.class);
         runGate = mock(AgentRunGate.class);
+        traceRecorder = mock(AgentChatTraceRecorder.class);
         agent = mock(ReActAgent.class);
-        service = new AgentChatServiceImpl(agentProvider, conversationService, taskManager, runGate);
+        service = new AgentChatServiceImpl(agentProvider, conversationService, taskManager, runGate, traceRecorder);
 
         gateReleased = new AtomicInteger();
         when(runGate.acquire(anyString(), anyString(), anyString())).thenReturn(gateReleased::incrementAndGet);

@@ -62,6 +62,12 @@ public class DashboardServiceImpl implements DashboardService {
     private static final String NO_DOC_REPLY = "未检索到与问题相关的文档内容。";
     private static final String GRANULARITY_DAY = "day";
     private static final String GRANULARITY_HOUR = "hour";
+
+    /**
+     * 分桶表达式：跨引擎统计按同一表达式在两张表上分桶，再合并同名桶
+     */
+    private static final String DAY_EXPR = "to_char(create_time,'YYYY-MM-DD')";
+    private static final String HOUR_EXPR = "to_char(create_time,'YYYY-MM-DD HH24:00:00')";
     private static final long SLOW_LATENCY_THRESHOLD_MS = 20000L;
     private static final DateTimeFormatter HOUR_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -69,6 +75,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final ConversationMapper conversationMapper;
     private final ConversationMessageMapper messageMapper;
     private final RagTraceRunMapper traceRunMapper;
+    private final DashboardCrossEngineStats crossEngineStats;
 
     @Override
     public DashboardOverviewVO loadOverview(String window) {
@@ -77,11 +84,13 @@ public class DashboardServiceImpl implements DashboardService {
         long totalUsers = userMapper.selectCount(Wrappers.lambdaQuery(UserDO.class));
         long usersInWindow = countUsers(range.start, range.end);
 
-        long totalSessions = conversationMapper.selectCount(Wrappers.lambdaQuery(ConversationDO.class));
+        // 总量与窗口量都走跨引擎统计：agent 引擎写的是 t_agent_*，
+        // 只读 workflow 那两张表会让 agent 模式下的仪表盘停在历史数据上
+        long totalSessions = crossEngineStats.countAllConversations();
         long sessionsInWindow = countConversations(range.start, range.end);
         long sessionsPrevWindow = countConversations(range.prevStart, range.prevEnd);
 
-        long totalMessages = messageMapper.selectCount(Wrappers.lambdaQuery(ConversationMessageDO.class));
+        long totalMessages = crossEngineStats.countAllMessages();
         long messagesInWindow = countMessages(range.start, range.end);
         long messagesPrevWindow = countMessages(range.prevStart, range.prevEnd);
 
@@ -271,23 +280,15 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private long countConversations(Date start, Date end) {
-        return conversationMapper.selectCount(Wrappers.lambdaQuery(ConversationDO.class)
-                .ge(ConversationDO::getCreateTime, start)
-                .lt(ConversationDO::getCreateTime, end));
+        return crossEngineStats.countConversations(start, end);
     }
 
     private long countMessages(Date start, Date end) {
-        return messageMapper.selectCount(Wrappers.lambdaQuery(ConversationMessageDO.class)
-                .ge(ConversationMessageDO::getCreateTime, start)
-                .lt(ConversationMessageDO::getCreateTime, end));
+        return crossEngineStats.countMessages(start, end);
     }
 
     private long countActiveUsers(Date start, Date end) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("count(distinct user_id) as cnt")
-                .ge("create_time", start)
-                .lt("create_time", end);
-        return extractCount(messageMapper.selectMaps(wrapper));
+        return crossEngineStats.countActiveUsers(start, end);
     }
 
     private long countTraceRuns(Date start, Date end, String status) {
@@ -300,20 +301,11 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private long countAssistantMessages(Date start, Date end) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.ge("create_time", start)
-                .lt("create_time", end)
-                .eq("role", ROLE_ASSISTANT);
-        return messageMapper.selectCount(wrapper);
+        return crossEngineStats.countAssistantMessages(start, end);
     }
 
     private long countNoDocMessages(Date start, Date end) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.ge("create_time", start)
-                .lt("create_time", end)
-                .eq("role", ROLE_ASSISTANT)
-                .eq("content", NO_DOC_REPLY);
-        return messageMapper.selectCount(wrapper);
+        return crossEngineStats.countNoDocMessages(start, end, NO_DOC_REPLY);
     }
 
     private List<Long> listDurations(Date start, Date end) {
@@ -365,51 +357,23 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private Map<LocalDate, Long> countConversationsByDay(LocalDate start, LocalDate endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD') as d", "count(*) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .groupBy("d");
-        return mapLongResults(conversationMapper.selectMaps(wrapper));
+        return mapLongResults(crossEngineStats.conversationsByDay(toDate(start, zoneId), toDate(endExclusive, zoneId)));
     }
 
     private Map<LocalDate, Long> countMessagesByDay(LocalDate start, LocalDate endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD') as d", "count(*) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .groupBy("d");
-        return mapLongResults(messageMapper.selectMaps(wrapper));
+        return mapLongResults(crossEngineStats.messagesByDay(toDate(start, zoneId), toDate(endExclusive, zoneId)));
     }
 
     private Map<LocalDate, Long> countAssistantMessagesByDay(LocalDate start, LocalDate endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD') as d", "count(*) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .eq("role", ROLE_ASSISTANT)
-                .groupBy("d");
-        return mapLongResults(messageMapper.selectMaps(wrapper));
+        return mapLongResults(crossEngineStats.assistantMessagesByDay(toDate(start, zoneId), toDate(endExclusive, zoneId)));
     }
 
     private Map<LocalDate, Long> countNoDocMessagesByDay(LocalDate start, LocalDate endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD') as d", "count(*) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .eq("role", ROLE_ASSISTANT)
-                .eq("content", NO_DOC_REPLY)
-                .groupBy("d");
-        return mapLongResults(messageMapper.selectMaps(wrapper));
+        return mapLongResults(crossEngineStats.noDocMessagesByDay(toDate(start, zoneId), toDate(endExclusive, zoneId), NO_DOC_REPLY));
     }
 
     private Map<LocalDate, Long> countActiveUsersByDay(LocalDate start, LocalDate endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD') as d", "count(distinct user_id) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .groupBy("d");
-        return mapLongResults(messageMapper.selectMaps(wrapper));
+        return mapLongResults(crossEngineStats.activeUsersByDay(toDate(start, zoneId), toDate(endExclusive, zoneId)));
     }
 
     private Map<LocalDate, Double> averageLatencyByDay(LocalDate start, LocalDate endExclusive, ZoneId zoneId) {
@@ -449,51 +413,23 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private Map<LocalDateTime, Long> countConversationsByHour(LocalDateTime start, LocalDateTime endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD HH24:00:00') as h", "count(*) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .groupBy("h");
-        return mapLongResultsByHour(conversationMapper.selectMaps(wrapper));
+        return mapLongResultsByHour(crossEngineStats.conversationsByHour(toDate(start, zoneId), toDate(endExclusive, zoneId)));
     }
 
     private Map<LocalDateTime, Long> countMessagesByHour(LocalDateTime start, LocalDateTime endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD HH24:00:00') as h", "count(*) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .groupBy("h");
-        return mapLongResultsByHour(messageMapper.selectMaps(wrapper));
+        return mapLongResultsByHour(crossEngineStats.messagesByHour(toDate(start, zoneId), toDate(endExclusive, zoneId)));
     }
 
     private Map<LocalDateTime, Long> countAssistantMessagesByHour(LocalDateTime start, LocalDateTime endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD HH24:00:00') as h", "count(*) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .eq("role", ROLE_ASSISTANT)
-                .groupBy("h");
-        return mapLongResultsByHour(messageMapper.selectMaps(wrapper));
+        return mapLongResultsByHour(crossEngineStats.assistantMessagesByHour(toDate(start, zoneId), toDate(endExclusive, zoneId)));
     }
 
     private Map<LocalDateTime, Long> countNoDocMessagesByHour(LocalDateTime start, LocalDateTime endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD HH24:00:00') as h", "count(*) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .eq("role", ROLE_ASSISTANT)
-                .eq("content", NO_DOC_REPLY)
-                .groupBy("h");
-        return mapLongResultsByHour(messageMapper.selectMaps(wrapper));
+        return mapLongResultsByHour(crossEngineStats.noDocMessagesByHour(toDate(start, zoneId), toDate(endExclusive, zoneId), NO_DOC_REPLY));
     }
 
     private Map<LocalDateTime, Long> countActiveUsersByHour(LocalDateTime start, LocalDateTime endExclusive, ZoneId zoneId) {
-        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
-        wrapper.select("to_char(create_time,'YYYY-MM-DD HH24:00:00') as h", "count(distinct user_id) as cnt")
-                .ge("create_time", toDate(start, zoneId))
-                .lt("create_time", toDate(endExclusive, zoneId))
-                .groupBy("h");
-        return mapLongResultsByHour(messageMapper.selectMaps(wrapper));
+        return mapLongResultsByHour(crossEngineStats.activeUsersByHour(toDate(start, zoneId), toDate(endExclusive, zoneId)));
     }
 
     private Map<LocalDateTime, Double> averageLatencyByHour(LocalDateTime start, LocalDateTime endExclusive, ZoneId zoneId) {

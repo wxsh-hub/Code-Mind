@@ -26,6 +26,7 @@ import com.nageoffer.ai.ragent.agent.dto.AgentMetaPayload;
 import com.nageoffer.ai.ragent.agent.enums.AgentSSEEventType;
 import com.nageoffer.ai.ragent.agent.service.AgentChatService;
 import com.nageoffer.ai.ragent.agent.service.AgentConversationService;
+import com.nageoffer.ai.ragent.agent.service.handler.AgentChatTraceRecorder;
 import com.nageoffer.ai.ragent.agent.service.handler.AgentRunGate;
 import com.nageoffer.ai.ragent.agent.service.handler.AgentRunHandle;
 import com.nageoffer.ai.ragent.agent.service.handler.AgentStreamEventBridge;
@@ -58,6 +59,7 @@ public class AgentChatServiceImpl implements AgentChatService {
     private final AgentConversationService conversationService;
     private final StreamTaskManager taskManager;
     private final AgentRunGate runGate;
+    private final AgentChatTraceRecorder traceRecorder;
 
     @Override
     public void streamChat(String question, String conversationId, SseEmitter emitter) {
@@ -96,6 +98,12 @@ public class AgentChatServiceImpl implements AgentChatService {
         // 记忆常驻内存是确定性泄漏，流一结束就驱逐：三条收尾路都会执行，换来内存上界
         // 状态已在框架侧随本轮落库（正常完成与打断各自 save 后才发终答），下一轮从 PG 读回，代价是一次反序列化
         runHandle.onRelease(() -> agentProvider.evictStateCache(userId, conversationId));
+
+        // 链路追踪：起在派发之前、收在释放钩子上，三条出口（完成/打断/失败）都会走到，
+        // 仪表盘的链路稳定性与耗时分布靠这条记录
+        AgentChatTraceRecorder.TraceHandle trace =
+                traceRecorder.begin(question, conversationId, taskId);
+        runHandle.onRelease(() -> traceRecorder.finish(trace, runHandle.getOutcome(), runHandle.getErrorMessage()));
         bindEmitterLifecycle(emitter, runHandle, taskId);
         // 实例与目录快照成对取出：事件展示名与 Toolkit 出自同一次解析
         ActiveAgent activeAgent = agentProvider.getAgent();
